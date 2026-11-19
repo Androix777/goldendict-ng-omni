@@ -1,96 +1,22 @@
 #ifdef WITH_WEB_VIEWER
   #include "local_web_server.hh"
-  #include "article_lookup.hh"
   #include "article_netmgr.hh"
+  #include "local_web_reply.hh"
 
   #include <QBuffer>
   #include <QFile>
-  #include <QPointer>
   #include <QTcpServer>
-  #include <QTcpSocket>
-  #include <QTimer>
   #include <QUuid>
   #include <QUrlQuery>
-  #if QT_VERSION >= QT_VERSION_CHECK( 6, 8, 0 )
-    #include <QHttpHeaders>
-  #endif
-
-using Status = QHttpServerResponder::StatusCode;
-
-// Keep the response, dictionary and request alive together until delivery.
-// Qt 6.4 exposes the socket directly. Newer responders own their stream.
-class BrowserReply: public QObject
-{
-public:
-  BrowserReply( QHttpServerResponder && r, QObject * owner ):
-    QObject( owner ),
-    responder( std::move( r ) )
-  {
-  #if QT_VERSION < QT_VERSION_CHECK( 6, 8, 0 )
-    socket = responder.socket();
-    connect( socket, &QTcpSocket::disconnected, this, &QObject::deleteLater );
-  #endif
-    QTimer::singleShot( 30000, this, [ this ] {
-      send( Status::GatewayTimeout );
-    } );
-  }
-
-  ~BrowserReply() override
-  {
-    if ( resource && !resource->isFinished() ) {
-      resource->cancel();
-    }
-  }
-
-  void send( Status status,
-             const QByteArray & bytes = {},
-             const QByteArray & type  = "text/plain; charset=utf-8",
-             QByteArray policy        = "default-src 'none'; frame-ancestors 'none'; sandbox" )
-  {
-    if ( sent ) {
-      return;
-    }
-    sent = true;
-    deleteLater();
-  #if QT_VERSION < QT_VERSION_CHECK( 6, 8, 0 )
-    if ( !socket || socket->state() != QAbstractSocket::ConnectedState ) {
-      return;
-    }
-    responder.write( bytes,
-                     { { "Content-Type", type },
-                       { "Content-Security-Policy", policy },
-                       { "X-Content-Type-Options", "nosniff" },
-                       { "Cross-Origin-Resource-Policy", "same-origin" },
-                       { "Cache-Control", "no-store" },
-                       { "Referrer-Policy", "no-referrer" } },
-                     status );
-  #else
-    QHttpHeaders headers;
-    headers.append( "Content-Type", type );
-    headers.append( "Content-Security-Policy", policy );
-    headers.append( "X-Content-Type-Options", "nosniff" );
-    headers.append( "Cross-Origin-Resource-Policy", "same-origin" );
-    headers.append( "Cache-Control", "no-store" );
-    headers.append( "Referrer-Policy", "no-referrer" );
-    responder.write( bytes, headers, status );
-  #endif
-  }
-
-  sptr< Dictionary::Class > dictionary;
-  sptr< Dictionary::DataRequest > resource;
-  std::unique_ptr< ArticleLookup > lookup;
-  QString page;
-
-private:
-  QHttpServerResponder responder;
-  bool sent = false;
-  #if QT_VERSION < QT_VERSION_CHECK( 6, 8, 0 )
-  QPointer< QTcpSocket > socket;
-  #endif
-};
 
 namespace {
 constexpr quint16 viewerPort = 18742;
+
+QUrlQuery formQuery( const QUrl & url )
+{
+  // HTML forms encode spaces as '+'. Preserve a literal plus encoded as %2B.
+  return QUrlQuery( QString::fromLatin1( url.query( QUrl::FullyEncoded ).toLatin1().replace( "+", "%20" ) ) );
+}
 
 QString dictionaryIconHtml( Dictionary::Class & dictionary )
 {
@@ -199,7 +125,7 @@ void LocalWebServer::setCatalogAvailable( bool available )
     const auto children = requests.children();
     for ( auto child : children ) {
       auto reply = static_cast< BrowserReply * >( child );
-      reply->send( Status::ServiceUnavailable );
+      reply->error( Status::ServiceUnavailable, "Dictionary catalog unavailable" );
       delete reply; // Release backend requests before replacing indices.
     }
   }
@@ -207,16 +133,20 @@ void LocalWebServer::setCatalogAvailable( bool available )
 
 void LocalWebServer::dispatch( const QHttpServerRequest & request, QHttpServerResponder && responder )
 {
-  auto & reply               = *new BrowserReply( std::move( responder ), &requests );
+  const QUrl target = request.url();
+  const QString path = target.path( QUrl::FullyDecoded );
+  const bool isApi = path.startsWith( "/api/" );
+  auto & reply = *new BrowserReply( std::move( responder ), &requests, isApi );
   const QByteArray authority = "127.0.0.1:" + QByteArray::number( port );
   if ( request.value( "Host" ) != authority ) {
-    return reply.send( Status::Forbidden );
+    return reply.error( Status::Forbidden, "Invalid Host" );
   }
   if ( !catalogAvailable || requests.children().size() > 48 ) {
-    return reply.send( Status::ServiceUnavailable );
+    return reply.error( Status::ServiceUnavailable, "Dictionary server unavailable" );
   }
-  const QUrl target  = request.url();
-  const QString path = target.path( QUrl::FullyDecoded );
+  if ( isApi ) {
+    return api( reply, path, formQuery( target ) );
+  }
   if ( path == "/" || path == "/lookup" ) {
     return lookup( reply, target );
   }
@@ -242,11 +172,33 @@ void LocalWebServer::dispatch( const QHttpServerRequest & request, QHttpServerRe
   reply.send( Status::NotFound );
 }
 
+const QSet< QString > & LocalWebServer::mutedDictionaries( unsigned groupId ) const
+{
+  const auto * configured = config.getGroup( groupId );
+  return configured && groupId != GroupId::AllGroupId ? configured->mutedDictionaries : config.mutedDictionaries;
+}
+
+ArticleLookup::Dictionaries LocalWebServer::localDictionaries( const Instances::Group & group, bool enabledOnly ) const
+{
+  ArticleLookup::Dictionaries selected;
+  const auto & muted = mutedDictionaries( group.id );
+  for ( const auto & dict : group.dictionaries ) {
+    if ( dict->isLocalDictionary() && ( !enabledOnly || !muted.contains( QString::fromStdString( dict->getId() ) ) ) ) {
+      selected.push_back( dict );
+    }
+  }
+  return selected;
+}
+
+std::unique_ptr< ArticleLookup > LocalWebServer::createLookup( const QString & word, ArticleLookup::Dictionaries selected ) const
+{
+  return std::make_unique< ArticleLookup >( word, std::move( selected ), QMap< QString, QString >{},
+                                            config.preferences.ignoreDiacritics );
+}
+
 void LocalWebServer::lookup( BrowserReply & reply, const QUrl & url )
 {
-  // HTML GET forms encode spaces as '+'. Preserve a literal plus encoded as %2B.
-  QByteArray encoded = url.query( QUrl::FullyEncoded ).toLatin1().replace( "+", "%20" );
-  QUrlQuery query( QString::fromLatin1( encoded ) );
+  const auto query = formQuery( url );
   QString word = query.queryItemValue( "word", QUrl::FullyDecoded ).trimmed();
   if ( word.size() > 512 ) {
     return reply.send( Status::BadRequest );
@@ -269,19 +221,7 @@ void LocalWebServer::lookup( BrowserReply & reply, const QUrl & url )
     return finish();
   }
 
-  const auto * configured = config.getGroup( groupId );
-  const auto & muted =
-    configured && groupId != GroupId::AllGroupId ? configured->mutedDictionaries : config.mutedDictionaries;
-  ArticleLookup::Dictionaries selected;
-  for ( const auto & dict : group->dictionaries ) {
-    if ( dict->isLocalDictionary() && !muted.contains( QString::fromStdString( dict->getId() ) ) ) {
-      selected.push_back( dict );
-    }
-  }
-  reply.lookup = std::make_unique< ArticleLookup >( word,
-                                                    std::move( selected ),
-                                                    QMap< QString, QString >{},
-                                                    config.preferences.ignoreDiacritics );
+  reply.lookup = createLookup( word, localDictionaries( *group, true ) );
   connect(
     reply.lookup.get(),
     &ArticleLookup::resultsReady,

@@ -1,0 +1,14 @@
+### Glossary title:Article text fixture
+### Glossary section:
+qt-layout
+<style>.senses{counter-reset:sense}.senses p{counter-increment:sense}.senses p::before{content:counter(sense) ". "}.senses rt{display:none}</style>
+<h3>Entry</h3><div class="senses"><p>前<ruby>事柄<rp>(</rp><rt>ことがら</rt><rp>)</rp></ruby>後</p><p hidden>invisible</p><p>second</p></div>
+<ol reversed start="7"><li>seven</li><li value="3">three</li><li>two</li></ol><ul style="list-style-type:square"><li>square</li></ul>
+<p><span>朝食を食べる</span><span style="margin-inline-start:1em"><i>eat</i> breakfast</span></p>
+<div><tr><th>語</th><th>訳</th></tr><tr><td>犬</td><td>dog</td></tr></div>
+<table><tr><td>left</td><td>right</td></tr></table>
+<p>前<img style="width:1em;height:1em">後</p><p>前<img role="presentation" style="width:1em;height:1em">後</p><p>前<img alt="字">後</p>
+<details><summary>more</summary>expanded example</details>
+
+qt-scan
+<img style="width:16em;height:16em"><p>←　→</p>

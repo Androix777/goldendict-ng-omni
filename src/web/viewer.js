@@ -60,11 +60,9 @@ function adaptLink(a) {
   }
 }
 const player = document.querySelector("audio#pronunciation");
-for (const section of document.querySelectorAll("[data-fragment]")) {
+function renderFragment(section, html) {
   const template = document.createElement("template");
-  const bytes = Uint8Array.from(atob(section.dataset.fragment), c => c.charCodeAt(0));
-  template.innerHTML = new TextDecoder().decode(bytes);
-  delete section.dataset.fragment;
+  template.innerHTML = html;
   const fragment = template.content;
   for (const el of fragment.querySelectorAll("script,iframe,frame,object,embed,base,meta,form,template,svg script")) el.remove();
   for (const el of fragment.querySelectorAll("*")) {
@@ -82,6 +80,11 @@ for (const section of document.querySelectorAll("[data-fragment]")) {
     }
   }
   section.append(fragment);
+}
+for (const section of document.querySelectorAll("[data-fragment]")) {
+  const bytes = Uint8Array.from(atob(section.dataset.fragment), c => c.charCodeAt(0));
+  delete section.dataset.fragment;
+  renderFragment(section, new TextDecoder().decode(bytes));
 }
 
 function setupDictionaryNavigation() {

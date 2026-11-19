@@ -2,5 +2,7 @@
   <qresource prefix="/viewer">
     <file>viewer.js</file>
     <file>viewer.css</file>
+    <file>text_layout.js</file>
+    <file>article_text.js</file>
   </qresource>
 </RCC>

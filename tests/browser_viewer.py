@@ -1,6 +1,6 @@
 """End-to-end smoke test for a running local viewer, using an isolated profile.
 
-python tests/browser_viewer.py --fixtures PATH creates two small DSL files in a
+python tests/browser_viewer.py --fixtures PATH creates small DSL and GLS fixtures in a
 new directory. Add that directory to GoldenDict, then File > Open Local Browser
 Viewer. With Python Playwright and Chromium installed, run this script again.
 """
@@ -16,6 +16,8 @@ WORD = "猫 + cat"
 
 def write_fixtures(directory):
     directory.mkdir(parents=True, exist_ok=False)
+    glossary = Path(__file__).with_name("fixtures") / "article_text.gls"
+    (directory / glossary.name).write_bytes(glossary.read_bytes())
     for label in ("A", "B"):
         content = f'#NAME "Browser fixture {label}"\n#INDEX_LANGUAGE "Japanese"\n#CONTENTS_LANGUAGE "English"\n'
         content += f"{WORD}\nKitten alias\n [b]Definition {label}[/b] 子猫 [ref]Second fixture word[/ref] [s]pixel.png[/s] [s]tone.wav[/s]\n"
