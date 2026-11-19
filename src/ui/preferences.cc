@@ -192,6 +192,10 @@ Preferences::Preferences( QWidget * parent, Config::Class & cfg_ ):
   ui.showDockIcon->hide();
 #endif
   ui.cbAutostart->setChecked( p.autoStart );
+  ui.autoStartWebViewer->setChecked( p.autoStartWebViewer );
+#ifndef WITH_WEB_VIEWER
+  ui.autoStartWebViewer->hide();
+#endif
   ui.doubleClickTranslates->setChecked( p.doubleClickTranslates );
   ui.selectBySingleClick->setChecked( p.selectWordBySingleClick );
   ui.autoScrollToTargetArticle->setChecked( p.autoScrollToTargetArticle );
@@ -500,6 +504,7 @@ Config::Preferences Preferences::getPreferences()
   p.closeToTray    = true;
 #endif
   p.autoStart                  = ui.cbAutostart->isChecked();
+  p.autoStartWebViewer         = ui.autoStartWebViewer->isChecked();
   p.doubleClickTranslates      = ui.doubleClickTranslates->isChecked();
   p.selectWordBySingleClick    = ui.selectBySingleClick->isChecked();
   p.autoScrollToTargetArticle  = ui.autoScrollToTargetArticle->isChecked();

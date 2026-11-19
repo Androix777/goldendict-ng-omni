@@ -798,6 +798,7 @@ Class load()
     if ( !preferences.namedItem( "showDockIcon" ).isNull() ) {
       c.preferences.showDockIcon = ( preferences.namedItem( "showDockIcon" ).toElement().text() == "1" );
     }
+    applyBoolOption( c.preferences.autoStartWebViewer, preferences.namedItem( "autoStartWebViewer" ) );
     c.preferences.autoStart    = ( preferences.namedItem( "autoStart" ).toElement().text() == "1" );
     c.preferences.alwaysOnTop  = ( preferences.namedItem( "alwaysOnTop" ).toElement().text() == "1" );
     c.preferences.searchInDock = ( preferences.namedItem( "searchInDock" ).toElement().text() == "1" );
@@ -1770,6 +1771,10 @@ void save( const Class & c )
 
     opt = dd.createElement( "autoStart" );
     opt.appendChild( dd.createTextNode( c.preferences.autoStart ? "1" : "0" ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "autoStartWebViewer" );
+    opt.appendChild( dd.createTextNode( c.preferences.autoStartWebViewer ? "1" : "0" ) );
     preferences.appendChild( opt );
 
     opt = dd.createElement( "doubleClickTranslates" );

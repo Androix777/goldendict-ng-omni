@@ -20,6 +20,8 @@ Choose **File > Open Local Browser Viewer** to read the current word in your bro
 
 The viewer searches enabled local dictionaries in the selected group and supports links between entries, dictionary styles, pictures and audio. Use **File > Stop Local Browser Viewer** to close the listener. Builds with the viewer need the Qt HTTP Server module (`-DWITH_WEB_VIEWER=ON`).
 
+To serve your bookmarked viewer automatically, enable **Preferences > Network > Start the local browser server when GoldenDict starts**. On subsequent launches the server starts after dictionaries and groups are loaded. Your browser opens only when you choose **Open Local Browser Viewer**. Stopping the server from the File menu applies to the current session.
+
 Select **Invert colors** to invert the reader and its illustrations. Your browser remembers this setting across lookups and sessions. The Yomitan popup uses its own colors.
 
 ## Screenshots

@@ -2932,6 +2932,10 @@ With this on however, it will hide the main window.</source>
       <translation>Автозапуск программы</translation>
     </message>
     <message>
+      <source>Start the local browser server when GoldenDict starts</source>
+      <translation>Запускать локальный сервер вместе с GoldenDict</translation>
+    </message>
+    <message>
       <source>Normally, clicking on a link, double-clicking on a word or looking up
 selection in an article loads the translation and almost immediately
 scrolls to the article from the same dictionary. With this option off,

@@ -329,17 +329,14 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
   ui.setupUi( this );
 #ifdef WITH_WEB_VIEWER
   auto openViewer = new QAction( tr( "&Open Local Browser Viewer" ), this );
-  auto stopViewer = new QAction( tr( "Stop Local Browser Viewer" ), this );
+  stopWebViewerAction = new QAction( tr( "Stop Local Browser Viewer" ), this );
   ui.menuFile->insertAction( ui.rescanFiles, openViewer );
-  ui.menuFile->insertAction( ui.rescanFiles, stopViewer );
-  stopViewer->setVisible( false );
-  connect( openViewer, &QAction::triggered, this, [ this, stopViewer ] {
-    openWebViewer();
-    stopViewer->setVisible( bool( webServer ) );
-  } );
-  connect( stopViewer, &QAction::triggered, this, [ this, stopViewer ] {
+  ui.menuFile->insertAction( ui.rescanFiles, stopWebViewerAction );
+  stopWebViewerAction->setVisible( false );
+  connect( openViewer, &QAction::triggered, this, &MainWindow::openWebViewer );
+  connect( stopWebViewerAction, &QAction::triggered, this, [ this ] {
     webServer.reset();
-    stopViewer->setVisible( false );
+    stopWebViewerAction->setVisible( false );
   } );
 #endif
 
@@ -1067,6 +1064,14 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
   } );
 
   updateStatusLine();
+
+#ifdef WITH_WEB_VIEWER
+  if ( cfg.preferences.autoStartWebViewer && !startWebViewer() ) {
+    const auto message = tr( "Could not start the local HTTP listener on 127.0.0.1:18742." );
+    qWarning() << message;
+    mainStatusBar->showMessage( message, 10000, QPixmap( ":/icons/error.svg" ) );
+  }
+#endif
 
 #ifdef Q_OS_MACOS
   if ( cfg.preferences.startWithScanPopupOn && !MacMouseOver::isAXAPIEnabled() ) {
@@ -4936,17 +4941,26 @@ void MainWindow::openWebsiteInNewTab( QString name, QString url, QString dictId,
 }
 
 #ifdef WITH_WEB_VIEWER
-void MainWindow::openWebViewer()
+bool MainWindow::startWebViewer()
 {
   if ( !webServer ) {
     auto server = std::make_unique< LocalWebServer >( groupInstances, cfg );
     if ( !server->listen() ) {
-      QMessageBox::warning( this,
-                            tr( "Browser viewer" ),
-                            tr( "Could not start the local HTTP listener on 127.0.0.1:18742." ) );
-      return;
+      return false;
     }
     webServer = std::move( server );
+    stopWebViewerAction->setVisible( true );
+  }
+  return true;
+}
+
+void MainWindow::openWebViewer()
+{
+  if ( !startWebViewer() ) {
+    QMessageBox::warning( this,
+                          tr( "Browser viewer" ),
+                          tr( "Could not start the local HTTP listener on 127.0.0.1:18742." ) );
+    return;
   }
   QUrl url = webServer->url();
   QUrlQuery query;

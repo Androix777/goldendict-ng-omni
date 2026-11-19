@@ -158,6 +158,8 @@ private:
   Instances::Groups groupInstances;
 #ifdef WITH_WEB_VIEWER
   std::unique_ptr< LocalWebServer > webServer;
+  QAction * stopWebViewerAction;
+  bool startWebViewer();
   void openWebViewer();
 #endif
   ArticleMaker articleMaker;

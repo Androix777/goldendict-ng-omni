@@ -294,6 +294,7 @@ struct Preferences
   bool showDockIcon   = false;
 
   bool autoStart;
+  bool autoStartWebViewer = false;
   bool doubleClickTranslates;
   bool selectWordBySingleClick;
   bool autoScrollToTargetArticle;
