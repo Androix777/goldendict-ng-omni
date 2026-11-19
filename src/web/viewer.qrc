@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/viewer">
+    <file>viewer.js</file>
+    <file>viewer.css</file>
+  </qresource>
+</RCC>

@@ -248,12 +248,12 @@ private:
   void doDeferredInit();
 
   /// Loads an article with the given offset, filling the given strings.
-  void loadArticle( uint32_t offset, string & articleText, bool noFilter = false );
+  void loadArticle( uint32_t offset, string & articleText, bool noFilter = false, ArticleAudioLink * audio = nullptr );
 
   /// Process resource links (images, audios, etc)
-  QString & filterResource( QString & article );
+  QString & filterResource( QString & article, ArticleAudioLink * audio = nullptr );
 
-  void replaceLinks( QString & id, QString & article );
+  void replaceLinks( QString & id, QString & article, ArticleAudioLink * audio );
   QString isolateStyleCssInHtml( const QString & description );
   //@font-face
   void replaceStyleInHtml( QString & id, QString & article );
@@ -557,7 +557,7 @@ void MdxArticleRequest::run()
     QString errorMessage;
 
     try {
-      dict.loadArticle( chain[ x ].articleOffset, articleBody );
+      dict.loadArticle( chain[ x ].articleOffset, articleBody, false, &audioLink );
     }
     catch ( exCorruptDictionary & ) {
       errorMessage = tr( "Dictionary file was tampered or corrupted" );
@@ -848,7 +848,7 @@ void MdxDictionary::loadIcon() noexcept
   dictionaryIconLoaded = true;
 }
 
-void MdxDictionary::loadArticle( uint32_t offset, string & articleText, bool noFilter )
+void MdxDictionary::loadArticle( uint32_t offset, string & articleText, bool noFilter, ArticleAudioLink * audio )
 {
   vector< char > chunk;
   // QMutexLocker _( &idxMutex );
@@ -880,13 +880,13 @@ void MdxDictionary::loadArticle( uint32_t offset, string & articleText, bool noF
 
   if ( !noFilter ) {
     article = MdictParser::substituteStylesheet( article, styleSheets );
-    article = filterResource( article );
+    article = filterResource( article, audio );
   }
 
   articleText = Utils::c_string( article );
 }
 
-QString & MdxDictionary::filterResource( QString & article )
+QString & MdxDictionary::filterResource( QString & article, ArticleAudioLink * audio )
 {
   QString id = QString::fromStdString( getId() );
 
@@ -895,7 +895,7 @@ QString & MdxDictionary::filterResource( QString & article )
   article.replace( RX::Mdx::protocolRelativeUrlQuoted, R"(\1https://)" );
   article.replace( RX::Mdx::protocolRelativeUrlUnquoted, R"(\1https://)" );
 
-  replaceLinks( id, article );
+  replaceLinks( id, article, audio );
 
   // Replace html/body/head with custom tags to avoid hoisting by browser
   article.replace( RX::Mdx::htmlTagStart, "<gd-section-html" );
@@ -912,7 +912,7 @@ QString & MdxDictionary::filterResource( QString & article )
   return article;
 }
 
-void MdxDictionary::replaceLinks( QString & id, QString & article )
+void MdxDictionary::replaceLinks( QString & id, QString & article, ArticleAudioLink * audio )
 {
   QString articleNewText;
   int linkPos                        = 0;
@@ -943,9 +943,10 @@ void MdxDictionary::replaceLinks( QString & id, QString & article )
         // the navigation before the page ever sees it.
         QString newTxt = match.captured( 1 ) + match.captured( 2 ) + "gdau://" + id + "/" + match.captured( 3 )
           + match.captured( 2 );
-        newLink = QString::fromUtf8(
-                    addAudioLink( "gdau://" + getId() + "/" + match.captured( 3 ).toUtf8().data(), getId() ).c_str() )
-          + newLink.replace( match.capturedStart(), match.capturedLength(), newTxt );
+        if ( audio ) {
+          audio->consider( "gdau://" + id + "/" + match.captured( 3 ) );
+        }
+        newLink.replace( match.capturedStart(), match.capturedLength(), newTxt );
       }
 
       match = RX::Mdx::wordCrossLink.match( newLink );

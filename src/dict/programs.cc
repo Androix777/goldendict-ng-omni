@@ -79,6 +79,7 @@ sptr< Dictionary::DataRequest > ProgramsDictionary::getArticle( const std::u32st
   switch ( prg.type ) {
     case Config::Program::Audio: {
       // Audio results are instantaneous
+      auto ret = std::make_shared< DataRequestInstant >( true );
       string result;
 
       string wordUtf8( Text::toUtf8( word ) );
@@ -92,13 +93,13 @@ sptr< Dictionary::DataRequest > ProgramsDictionary::getArticle( const std::u32st
 
       string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-      addAudioLink( url.toEncoded(), getId() );
+      ret->audioLink.consider( url.toEncoded() );
 
       result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
       result += "<a href=" + ref + ">" + Html::escape( wordUtf8 ) + "</a>";
       result += "</div></div>";
 
-      auto ret = std::make_shared< DataRequestInstant >( true );
+
       ret->appendString( result );
       return ret;
     }

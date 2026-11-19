@@ -217,6 +217,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
     return std::make_shared< Dictionary::DataRequestInstant >( false ); // No such word
   }
 
+  auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
   string result;
 
   multimap< std::u32string, uint32_t >::const_iterator i;
@@ -261,7 +262,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    result += addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + Html::escape( displayedName ) + "</a>";
@@ -303,7 +304,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + Html::escape( displayedName ) + "</a>";
@@ -312,7 +313,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
 
   result += "</div>";
 
-  auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
+
   ret->appendString( result );
   return ret;
 }

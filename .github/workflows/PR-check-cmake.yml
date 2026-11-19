@@ -47,7 +47,7 @@ jobs:
           qt6-tools-dev-tools \
           qt6-webchannel-dev \
           libtomlplusplus-dev \
-          qt6-webengine-dev
+          qt6-httpserver-dev qt6-websockets-dev qt6-webengine-dev
       - uses: actions/checkout@v6
         with:
           submodules: false
@@ -137,7 +137,7 @@ jobs:
         with:
           version: 6.10.3
           arch: win64_msvc2022_64
-          modules: qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
+          modules: qthttpserver qtwebsockets qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
           # setup-python: 'false'
       - uses: actions/checkout@v6
         with:
@@ -210,7 +210,7 @@ jobs:
             qt6-speech \
             qt6-svg \
             qt6-tools \
-            qt6-webengine \
+            qt6-httpserver qt6-webengine \
             tomlplusplus \
             xapian-core
 

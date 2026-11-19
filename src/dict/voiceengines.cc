@@ -81,6 +81,7 @@ sptr< Dictionary::DataRequest >
 VoiceEnginesDictionary::getArticle( const u32string & word, const vector< u32string > &, const u32string &, bool )
 
 {
+  auto ret = std::make_shared< DataRequestInstant >( true );
   string result;
   string wordUtf8( Text::toUtf8( word ) );
 
@@ -96,13 +97,13 @@ VoiceEnginesDictionary::getArticle( const u32string & word, const vector< u32str
 
   string encodedUrl = url.toEncoded().data();
   string ref        = string( "\"" ) + encodedUrl + "\"";
-  addAudioLink( encodedUrl, getId() );
+  ret->audioLink.consider( QString::fromStdString( encodedUrl ) );
 
   result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
   result += "<a href=" + ref + ">" + Html::escape( wordUtf8 ) + "</a>";
   result += "</div></div>";
 
-  auto ret = std::make_shared< DataRequestInstant >( true );
+
   ret->appendString( result );
   return ret;
 }

@@ -211,11 +211,11 @@ private:
 
   /// Loads the article, storing its headword and formatting the data it has
   /// into an html.
-  void loadArticle( uint32_t address, string & headword, string & articleText );
+  void loadArticle( uint32_t address, string & headword, string & articleText, ArticleAudioLink * audio = nullptr );
 
   string loadString( size_t size );
 
-  string handleResource( char type, const char * resource, size_t size );
+  string handleResource( char type, const char * resource, size_t size, ArticleAudioLink * audio );
 
   void pangoToHtml( QString & text );
 
@@ -441,14 +441,14 @@ private:
 
 /// This function tries to make an html of the Stardict's resource typed
 /// 'type', contained in a block pointed to by 'resource', 'size' bytes long.
-string StardictDictionary::handleResource( char type, const char * resource, size_t size )
+string StardictDictionary::handleResource( char type, const char * resource, size_t size, ArticleAudioLink * audio )
 {
   QString text;
 
   // See "Type identifiers" at http://www.huzheng.org/stardict/StarDictFileFormat
   switch ( type ) {
     case 'x': // Xdxf content
-      return Xdxf2Html::convert( string( resource, size ), Xdxf2Html::STARDICT, NULL, this );
+      return Xdxf2Html::convert( string( resource, size ), Xdxf2Html::STARDICT, NULL, this, false, 0, nullptr, audio );
     case 'h': // Html content
     {
       QString articleText = QString( "<div class=\"sdct_h\">" ) + QString::fromUtf8( resource, size ) + "</div>";
@@ -543,7 +543,10 @@ string StardictDictionary::handleResource( char type, const char * resource, siz
         else {
           std::string audioLink = "gdau://" + getId() + "/" + src.toUtf8().data();
           std::string href      = "\"" + audioLink + "\"";
-          std::string newTag = addAudioLink( audioLink, getId() ) + "<span class=\"sdict_h_wav\"><a href=" + href + ">";
+          if ( audio ) {
+            audio->consider( QString::fromStdString( audioLink ) );
+          }
+          std::string newTag = "<span class=\"sdict_h_wav\"><a href=" + href + ">";
           newTag += match.captured( 4 ).toUtf8().constData();
           if ( match.captured( 4 ).indexOf( "<img " ) < 0 ) {
             newTag += R"( <img src="qrc:///icons/playsound.svg" border="0" alt="Play">)";
@@ -925,7 +928,10 @@ void StardictDictionary::pangoToHtml( QString & text )
   text.replace( "  ", "&nbsp;&nbsp;" );
 }
 
-void StardictDictionary::loadArticle( uint32_t address, string & headword, string & articleText )
+void StardictDictionary::loadArticle( uint32_t address,
+                                      string & headword,
+                                      string & articleText,
+                                      ArticleAudioLink * audio )
 {
   uint32_t offset, size;
 
@@ -982,7 +988,7 @@ void StardictDictionary::loadArticle( uint32_t address, string & headword, strin
           break;
         }
 
-        articleText += handleResource( type, ptr, entrySize );
+        articleText += handleResource( type, ptr, entrySize, audio );
 
         if ( !entrySizeKnown ) {
           ++entrySize; // Need to skip the zero byte
@@ -1017,7 +1023,7 @@ void StardictDictionary::loadArticle( uint32_t address, string & headword, strin
           break;
         }
 
-        articleText += handleResource( type, ptr, entrySize );
+        articleText += handleResource( type, ptr, entrySize, audio );
 
         ptr += entrySize;
         size -= entrySize;
@@ -1045,7 +1051,7 @@ void StardictDictionary::loadArticle( uint32_t address, string & headword, strin
           break;
         }
 
-        articleText += handleResource( *ptr, ptr + 1, len );
+        articleText += handleResource( *ptr, ptr + 1, len, audio );
 
         ptr += len + 2;
         size -= len + 2;
@@ -1072,7 +1078,7 @@ void StardictDictionary::loadArticle( uint32_t address, string & headword, strin
           break;
         }
 
-        articleText += handleResource( *ptr, ptr + 1 + sizeof( uint32_t ), entrySize );
+        articleText += handleResource( *ptr, ptr + 1 + sizeof( uint32_t ), entrySize, audio );
 
         ptr += sizeof( uint32_t ) + 1 + entrySize;
         size -= sizeof( uint32_t ) + 1 + entrySize;
@@ -1374,7 +1380,7 @@ void StardictArticleRequest::run()
 
       string headword, articleText;
 
-      dict.loadArticle( chain[ x ].articleOffset, headword, articleText );
+      dict.loadArticle( chain[ x ].articleOffset, headword, articleText, &audioLink );
 
       // Ok. Now, does it go to main articles, or to alternate ones? We list
       // main ones first, and alternates after.

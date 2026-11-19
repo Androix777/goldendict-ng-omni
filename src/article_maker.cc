@@ -20,8 +20,6 @@
 
 using std::vector;
 using std::string;
-using std::set;
-using std::list;
 
 inline bool ankiConnectEnabled()
 {
@@ -437,11 +435,10 @@ ArticleRequest::ArticleRequest( const QString & word,
                                 bool ignoreDiacritics_ ):
   word( word ),
   group( group_ ),
-  contexts( contexts_ ),
   activeDicts( activeDicts_ ),
-  articleSizeLimit( sizeLimit ),
-  needExpandOptionalParts( needExpandOptionalParts_ ),
-  ignoreDiacritics( ignoreDiacritics_ )
+  lookup( word, activeDicts_, contexts_, ignoreDiacritics_ ),
+  articleSizeLimit( activeDicts_.size() <= 1 ? -1 : sizeLimit ),
+  needExpandOptionalParts( needExpandOptionalParts_ )
 {
   // No need to lock dataMutex on construction
 
@@ -462,81 +459,8 @@ ArticleRequest::ArticleRequest( const QString & word,
   //clear founded dicts.
   emit GlobalBroadcaster::instance() -> dictionaryClear( ActiveDictIds{ group.id, word } );
 
-  // Accumulate main forms
-  for ( const auto & activeDict : activeDicts ) {
-    const auto s = activeDict->findHeadwordsForSynonym( Text::removeTrailingZero( word ) );
-
-    connect( s.get(), &Dictionary::Request::finished, this, &ArticleRequest::altSearchFinished, Qt::QueuedConnection );
-
-    altSearches.push_back( s );
-  }
-
-  altSearchFinished(); // Handle any ones which have already finished
-}
-
-void ArticleRequest::altSearchFinished()
-{
-  if ( altsDone ) {
-    return;
-  }
-
-  // Check every request for finishing
-  for ( auto i = altSearches.begin(); i != altSearches.end(); ) {
-    if ( ( *i )->isFinished() ) {
-      // This one's finished
-      for ( size_t count = ( *i )->matchesCount(), x = 0; x < count; ++x ) {
-        alts.insert( ( **i )[ x ].word );
-      }
-
-      altSearches.erase( i++ );
-    }
-    else {
-      ++i;
-    }
-  }
-
-  if ( altSearches.empty() ) {
-
-    // They all've finished! Now we can look up bodies
-
-    altsDone = true; // So any pending signals in queued mode won't mess us up
-
-    vector< std::u32string > altsVector( alts.begin(), alts.end() );
-
-    std::u32string wordStd = word.toStdU32String();
-
-    if ( activeDicts.size() <= 1 ) {
-      articleSizeLimit = -1; // Don't collapse article if only one dictionary presented
-    }
-
-    for ( const auto & activeDict : activeDicts ) {
-      try {
-        if ( word == ":about" ) {
-          QString description = activeDict->getDescription();
-          auto r              = std::make_shared< Dictionary::DataRequestInstant >( true );
-          r->appendString( description.toStdString() );
-          bodyRequests.push_back( r );
-        }
-        else {
-          sptr< Dictionary::DataRequest > r = activeDict->getArticle(
-            wordStd,
-            altsVector,
-            Text::removeTrailingZero( contexts.value( QString::fromStdString( activeDict->getId() ) ) ),
-            ignoreDiacritics );
-
-          connect( r.get(), &Dictionary::Request::finished, this, &ArticleRequest::bodyFinished, Qt::QueuedConnection );
-
-          bodyRequests.push_back( r );
-        }
-      }
-      catch ( const std::exception & e ) {
-        qWarning() << "getArticle request error:" << e.what() << "in"
-                   << QString::fromStdString( activeDict->getName() );
-      }
-    }
-
-    bodyFinished(); // Handle any ones which have already finished
-  }
+  connect( &lookup, &ArticleLookup::resultsReady, this, &ArticleRequest::renderArticles );
+  lookup.start();
 }
 
 int ArticleRequest::findEndOfCloseDiv( const QString & str, int pos )
@@ -603,129 +527,103 @@ bool ArticleRequest::isCollapsable( Dictionary::DataRequest & req, const QString
   return collapse;
 }
 
-void ArticleRequest::bodyFinished()
+void ArticleRequest::renderArticles( const std::vector< ArticleLookup::Result > & results, bool complete )
 {
-  if ( bodyDone ) {
-    return;
-  }
-
-  bool wasUpdated = false;
-
   QStringList dictIds;
-  while ( bodyRequests.size() ) {
-    // Since requests should go in order, check the first one first
-    if ( bodyRequests.front()->isFinished() ) {
-      // Good
+  for ( const auto & result : results ) {
+    const auto & activeDict   = result.dictionary;
+    auto & req                = *result.article;
+    const QString errorString = req.getErrorString();
+    string dictId             = activeDict->getId();
 
-      Dictionary::DataRequest & req = *bodyRequests.front();
+    qDebug() << "dict:" << activeDict->getName().c_str() << " finished.";
 
-      QString errorString = req.getErrorString();
+    dictIds << QString::fromStdString( dictId );
+    string head;
 
-      if ( req.dataSize() >= 0 || errorString.size() ) {
-        const sptr< Dictionary::Class > & activeDict = activeDicts[ activeDicts.size() - bodyRequests.size() ];
+    string gdFrom = "gdfrom-" + Html::escape( dictId );
 
-        string dictId = activeDict->getId();
+    bool collapse = isCollapsable( req, QString::fromStdString( dictId ) );
 
-        qDebug() << "dict:" << activeDict->getName().c_str() << " finished.";
+    string jsVal = Html::escapeForJavaScript( dictId );
 
-        dictIds << QString::fromStdString( dictId );
-        string head;
-
-        string gdFrom = "gdfrom-" + Html::escape( dictId );
-
-        bool collapse = isCollapsable( req, QString::fromStdString( dictId ) );
-
-        string jsVal = Html::escapeForJavaScript( dictId );
-
-        fmt::format_to( std::back_inserter( head ),
-                        FMT_COMPILE(
-                          R"( <article class="gdarticle {0} {1}" id="{2}"
+    fmt::format_to( std::back_inserter( head ),
+                    FMT_COMPILE(
+                      R"( <article class="gdarticle {0} {1}" id="{2}"
                               data-gd-id="{3}"
                               >)" ),
-                        "",
-                        collapse ? " gdcollapsedarticle" : "",
-                        gdFrom,
-                        jsVal );
+                    "",
+                    collapse ? " gdcollapsedarticle" : "",
+                    gdFrom,
+                    jsVal );
 
-        fmt::format_to(
-          std::back_inserter( head ),
-          FMT_COMPILE(
-            R"(<gd-dict-header class="gddictname" {1}  id="gddictname-{0}" title="{2}" role="button" aria-expanded="{7}">
+    fmt::format_to(
+      std::back_inserter( head ),
+      FMT_COMPILE(
+        R"(<gd-dict-header class="gddictname" {1}  id="gddictname-{0}" title="{2}" role="button" aria-expanded="{7}">
                       <span class="gddicticon"><img src="gico://{0}/dicticon.png" alt=""></span>
                       <span class="gdfromprefix">{3}</span>
                       <span class="gddicttitle">{4}</span>
                       <span class="collapse_expand_area"><img class="{5}" id="expandicon-{0}" title="{6}" alt="" ></span>
                      </gd-dict-header>)" ),
-          dictId,
-          collapse ? R"(style="cursor:pointer;")" : "",
-          "",
-          Html::escape( tr( "From " ).toStdString() ),
-          Html::escape( activeDict->getName() ),
-          collapse ? "gdexpandicon" : "gdcollapseicon",
-          "",
-          collapse ? "false" : "true" );
+      dictId,
+      collapse ? R"(style="cursor:pointer;")" : "",
+      "",
+      Html::escape( tr( "From " ).toStdString() ),
+      Html::escape( activeDict->getName() ),
+      collapse ? "gdexpandicon" : "gdcollapseicon",
+      "",
+      collapse ? "false" : "true" );
 
 
-        // If the user has enabled Anki integration in settings,
-        // Show a (+) button that lets the user add a new Anki card.
-        if ( ankiConnectEnabled() ) {
-          QString link{ R"EOF(
+    // If the user has enabled Anki integration in settings,
+    // Show a (+) button that lets the user add a new Anki card.
+    if ( ankiConnectEnabled() ) {
+      QString link{ R"EOF(
           <a href="ankicard:%1" class="ankibutton" title="%2" >
           <img src="qrc:///icons/add-anki-icon.svg">
           </a>
           )EOF" };
-          head += link.arg( Html::escape( dictId ).c_str(), tr( "Make a new Anki note" ) ).toStdString();
-        }
+      head += link.arg( Html::escape( dictId ).c_str(), tr( "Make a new Anki note" ) ).toStdString();
+    }
 
-        fmt::format_to(
-          std::back_inserter( head ),
-          FMT_COMPILE( R"(<section class="gdarticlebody gdlangfrom-{}" lang="{}" style="display:{}" id="gd-{}">)" ),
-          LangCoder::intToCode2( activeDict->getLangFrom() ).toStdString(),
-          LangCoder::intToCode2( activeDict->getLangTo() ).toStdString(),
-          collapse ? "none" : "block",
-          dictId );
+    fmt::format_to(
+      std::back_inserter( head ),
+      FMT_COMPILE( R"(<section class="gdarticlebody gdlangfrom-{}" lang="{}" style="display:{}" id="gd-{}">)" ),
+      LangCoder::intToCode2( activeDict->getLangFrom() ).toStdString(),
+      LangCoder::intToCode2( activeDict->getLangTo() ).toStdString(),
+      collapse ? "none" : "block",
+      dictId );
 
-        if ( errorString.size() ) {
-          head += "<div class=\"gderrordesc\">"
-            + Html::escape( tr( "Query error: %1" ).arg( errorString ).toUtf8().data() ) + "</div>";
-        }
+    if ( errorString.size() ) {
+      head += "<div class=\"gderrordesc\">" + Html::escape( tr( "Query error: %1" ).arg( errorString ).toUtf8().data() )
+        + "</div>";
+    }
 
-        appendString( head );
+    appendString( head );
 
-        try {
-          if ( req.dataSize() > 0 ) {
-            auto d = bodyRequests.front()->getFullData();
-            appendDataSlice( &d.front(), d.size() );
-          }
-        }
-        catch ( const std::exception & e ) {
-          qWarning() << "getDataSlice error:" << e.what();
-        }
-
-        auto separator = R"(</section></article><div style="clear:both;"></div><span class="gdarticleseparator"></span>)";
-        appendString( separator );
-
-        wasUpdated = true;
-
-        foundAnyDefinitions = true;
-
-        //signal finished dictionary for pronounciation
-        GlobalBroadcaster::instance()->pronounce_engine.finishDictionary( dictId );
+    try {
+      if ( req.dataSize() > 0 ) {
+        const auto & d = req.getFullData();
+        appendDataSlice( &d.front(), d.size() );
       }
-      bodyRequests.pop_front();
     }
-    else {
-      // qDebug() << "--- top not finished";
-      break;
+    catch ( const std::exception & e ) {
+      qWarning() << "getDataSlice error:" << e.what();
     }
+
+    auto separator = R"(</section></article><div style="clear:both;"></div><span class="gdarticleseparator"></span>)";
+    appendString( separator );
+
+    foundAnyDefinitions = true;
+
+    GlobalBroadcaster::instance()->pronounce_engine.offer( req.audioLink.url() );
   }
 
   ActiveDictIds hittedWord{ group.id, word, dictIds };
 
-  if ( bodyRequests.empty() ) {
+  if ( complete ) {
     // No requests left, end the article
-
-    bodyDone = true;
 
     string footer;
     string morphologyContent;
@@ -784,7 +682,7 @@ void ArticleRequest::bodyFinished()
       dictIds.clear();
     }
   }
-  else if ( wasUpdated ) {
+  else if ( !results.empty() ) {
     update();
     qDebug() << "send dicts(updated):" << hittedWord;
     emit GlobalBroadcaster::instance() -> dictionaryChanges( hittedWord );
@@ -1096,17 +994,7 @@ void ArticleRequest::cancel()
   if ( isFinished() ) {
     return;
   }
-  if ( !altSearches.empty() ) {
-    for ( list< sptr< Dictionary::WordSearchRequest > >::iterator i = altSearches.begin(); i != altSearches.end();
-          ++i ) {
-      ( *i )->cancel();
-    }
-  }
-  if ( !bodyRequests.empty() ) {
-    for ( list< sptr< Dictionary::DataRequest > >::iterator i = bodyRequests.begin(); i != bodyRequests.end(); ++i ) {
-      ( *i )->cancel();
-    }
-  }
+  lookup.cancel();
   if ( stemmedWordFinder.get() ) {
     stemmedWordFinder->cancel();
   }

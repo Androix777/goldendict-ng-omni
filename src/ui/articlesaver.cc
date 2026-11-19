@@ -9,6 +9,7 @@
 #include "config.hh"
 #include <QStatusBar>
 
+#include <set>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QRegularExpression>

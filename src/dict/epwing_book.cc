@@ -1538,7 +1538,10 @@ QByteArray EpwingBook::handleWave( EB_Hook_Code code, const unsigned int * argv 
   url.setPath( Utils::Url::ensureLeadingSlash( name ) );
 
   string ref        = string( "\"" ) + url.toEncoded().data() + "\"";
-  QByteArray result = addAudioLink( url.toEncoded(), dictID.toUtf8().data() ).c_str();
+  if ( articleAudio ) {
+    articleAudio->consider( url.toEncoded() );
+  }
+  QByteArray result;
 
   result += QByteArray( "<span class=\"epwing_wav\"><a href=" ) + ref.c_str() + ">";
 

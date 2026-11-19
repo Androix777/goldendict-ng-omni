@@ -1,28 +1,17 @@
 #pragma once
 
 #include <QObject>
-#include <QMap>
-#include <QMutex>
 
-
-enum class PronounceState {
-  AVAILABLE,
-  OCCUPIED
-};
-
+/// Desktop pronunciation selection. Called on the application thread.
 class PronounceEngine: public QObject
 {
   Q_OBJECT
-  PronounceState state = PronounceState::AVAILABLE;
-  QMutex mutex;
-
-  QMap< std::string, QList< QString > > dictAudioMap;
+  bool occupied = false;
 
 public:
   explicit PronounceEngine( QObject * parent = nullptr );
   void reset();
-  void sendAudio( const std::string & dictId, const QString & audioLink );
-  void finishDictionary( std::string dictId );
+  void offer( const QString & link );
 signals:
   void emitAudio( QString audioLink );
 };

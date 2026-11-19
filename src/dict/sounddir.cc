@@ -293,6 +293,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
     return std::make_shared< Dictionary::DataRequestInstant >( false ); // No such word
   }
 
+  auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
   string result;
 
   multimap< std::u32string, uint32_t >::const_iterator i;
@@ -331,7 +332,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    result += addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + _displayName + "</a>";
@@ -368,7 +369,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + _displayName + "</a>";
@@ -377,7 +378,6 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
 
   result += "</div>";
 
-  auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
 
   ret->appendString( result );
 

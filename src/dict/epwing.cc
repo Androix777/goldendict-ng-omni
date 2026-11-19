@@ -1,3 +1,4 @@
+#include <QScopedValueRollback>
 /* This file is (c) 2014 Abs62
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 #include <QDir>
@@ -151,17 +152,23 @@ protected:
 private:
 
   /// Loads the article.
-  void loadArticle(
-    quint32 address, string & articleHeadword, string & articleText, int & articlePage, int & articleOffset );
+  void loadArticle( quint32 address,
+                    string & articleHeadword,
+                    string & articleText,
+                    int & articlePage,
+                    int & articleOffset,
+                    ArticleAudioLink & audio );
 
 
   sptr< Dictionary::WordSearchRequest > findHeadwordsForSynonym( const u32string & word ) override;
 
-  void loadArticleNextPage( string & articleHeadword, string & articleText, int & articlePage, int & articleOffset );
-  void
-  loadArticlePreviousPage( string & articleHeadword, string & articleText, int & articlePage, int & articleOffset );
+  void loadArticleNextPage(
+    string & articleHeadword, string & articleText, int & articlePage, int & articleOffset, ArticleAudioLink & audio );
+  void loadArticlePreviousPage(
+    string & articleHeadword, string & articleText, int & articlePage, int & articleOffset, ArticleAudioLink & audio );
 
-  void loadArticle( int articlePage, int articleOffset, string & articleHeadword, string & articleText );
+  void loadArticle(
+    int articlePage, int articleOffset, string & articleHeadword, string & articleText, ArticleAudioLink & audio );
 
   const QString & getImagesCacheDir()
   {
@@ -245,8 +252,12 @@ void EpwingDictionary::loadIcon() noexcept
   dictionaryIconLoaded = true;
 }
 
-void EpwingDictionary::loadArticle(
-  quint32 address, string & articleHeadword, string & articleText, int & articlePage, int & articleOffset )
+void EpwingDictionary::loadArticle( quint32 address,
+                                    string & articleHeadword,
+                                    string & articleText,
+                                    int & articlePage,
+                                    int & articleOffset,
+                                    ArticleAudioLink & audio )
 {
   vector< char > chunk;
 
@@ -264,6 +275,7 @@ void EpwingDictionary::loadArticle(
 
   try {
     QMutexLocker _( &eBook.getLibMutex() );
+    QScopedValueRollback< ArticleAudioLink * > capture( eBook.articleAudio, &audio );
     eBook.getArticle( headword, text, articlePage, articleOffset, false );
   }
   catch ( std::exception & e ) {
@@ -288,15 +300,14 @@ string Epwing::EpwingDictionary::epwing_previous_button( const int & articlePage
   return previousLink;
 }
 
-void EpwingDictionary::loadArticleNextPage( string & articleHeadword,
-                                            string & articleText,
-                                            int & articlePage,
-                                            int & articleOffset )
+void EpwingDictionary::loadArticleNextPage(
+  string & articleHeadword, string & articleText, int & articlePage, int & articleOffset, ArticleAudioLink & audio )
 {
   QString headword, text;
   EB_Position pos;
   try {
     QMutexLocker _( &eBook.getLibMutex() );
+    QScopedValueRollback< ArticleAudioLink * > capture( eBook.articleAudio, &audio );
     pos = eBook.getArticleNextPage( headword, text, articlePage, articleOffset, false );
   }
   catch ( std::exception & e ) {
@@ -325,15 +336,14 @@ string Epwing::EpwingDictionary::epwing_next_button( const int & articlePage, co
   return nextLink;
 }
 
-void EpwingDictionary::loadArticlePreviousPage( string & articleHeadword,
-                                                string & articleText,
-                                                int & articlePage,
-                                                int & articleOffset )
+void EpwingDictionary::loadArticlePreviousPage(
+  string & articleHeadword, string & articleText, int & articlePage, int & articleOffset, ArticleAudioLink & audio )
 {
   QString headword, text;
   EB_Position pos;
   try {
     QMutexLocker _( &eBook.getLibMutex() );
+    QScopedValueRollback< ArticleAudioLink * > capture( eBook.articleAudio, &audio );
     pos = eBook.getArticlePreviousPage( headword, text, articlePage, articleOffset, false );
   }
   catch ( std::exception & e ) {
@@ -353,12 +363,14 @@ void EpwingDictionary::loadArticlePreviousPage( string & articleHeadword,
   articleText         = articleText + "</div>";
 }
 
-void EpwingDictionary::loadArticle( int articlePage, int articleOffset, string & articleHeadword, string & articleText )
+void EpwingDictionary::loadArticle(
+  int articlePage, int articleOffset, string & articleHeadword, string & articleText, ArticleAudioLink & audio )
 {
   QString headword, text;
 
   try {
     QMutexLocker _( &eBook.getLibMutex() );
+    QScopedValueRollback< ArticleAudioLink * > capture( eBook.articleAudio, &audio );
     eBook.getArticle( headword, text, articlePage, articleOffset, false );
   }
   catch ( std::exception & e ) {
@@ -625,7 +637,7 @@ void EpwingArticleRequest::run()
     int articleOffset = 0;
 
     try {
-      dict.loadArticle( x.articleOffset, headword, articleText, articlePage, articleOffset );
+      dict.loadArticle( x.articleOffset, headword, articleText, articlePage, articleOffset, audioLink );
     }
     catch ( ... ) {
     }
@@ -689,10 +701,10 @@ void EpwingArticleRequest::run()
     int articlePage   = m.captured( 1 ).toInt();
     int articleOffset = m.captured( 2 ).toInt();
     if ( word[ 0 ] == 'r' )
-      dict.loadArticleNextPage( headword, articleText, articlePage, articleOffset );
+      dict.loadArticleNextPage( headword, articleText, articlePage, articleOffset, audioLink );
     else {
       //starts with p
-      dict.loadArticlePreviousPage( headword, articleText, articlePage, articleOffset );
+      dict.loadArticlePreviousPage( headword, articleText, articlePage, articleOffset, audioLink );
     }
 
     //the reference may not contain valid text. at this point ,should return directly.
@@ -740,7 +752,7 @@ void EpwingArticleRequest::getBuiltInArticle( const u32string & word_,
       }
 
       if ( !already ) {
-        dict.loadArticle( pg.at( i ), off.at( i ), headword, articleText );
+        dict.loadArticle( pg.at( i ), off.at( i ), headword, articleText, audioLink );
 
         mainArticles.insert( pair( Folding::applySimpleCaseOnly( headword ), pair( headword, articleText ) ) );
 

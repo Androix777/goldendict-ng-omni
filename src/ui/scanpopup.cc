@@ -15,7 +15,6 @@
 #include <QMessageBox>
 #include "gestures.hh"
 
-using std::set;
 using std::map;
 using std::pair;
 

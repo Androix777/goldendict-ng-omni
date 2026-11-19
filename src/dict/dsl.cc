@@ -139,10 +139,13 @@ class DslDictionary: public BtreeIndexing::BtreeDictionary
 
   string initError;
 
-  int optionalPartNom;
-  quint8 articleNom;
-
-  std::u32string currentHeadword;
+  struct RenderContext
+  {
+    ArticleAudioLink & audio;
+    unsigned articleNom      = 0;
+    unsigned optionalPartNom = 0;
+    std::u32string currentHeadword;
+  };
   string resourceDir1, resourceDir2;
 
 public:
@@ -240,17 +243,12 @@ private:
                     std::u32string & articleText );
 
   /// Converts DSL language to an Html.
-  string dslToHtml( const std::u32string &, const std::u32string & headword = std::u32string() );
+  string dslToHtml( const std::u32string &, const std::u32string & headword, RenderContext & context );
 
   // Parts of dslToHtml()
-  string nodeToHtml( const ArticleDom::Node & );
-  string processNodeChildren( const ArticleDom::Node & node );
+  string nodeToHtml( const ArticleDom::Node &, RenderContext & context );
+  string processNodeChildren( const ArticleDom::Node & node, RenderContext & context );
   string getNodeLink( const ArticleDom::Node & node );
-
-  bool hasHiddenZones() /// Return true if article has hidden zones
-  {
-    return optionalPartNom != 0;
-  }
 
   friend class DslArticleRequest;
   friend class DslResourceRequest;
@@ -262,9 +260,7 @@ DslDictionary::DslDictionary( const string & id, const string & indexFile, const
   idx( indexFile, QIODevice::ReadOnly ),
   idxHeader( idx.read< IdxHeader >() ),
   dz( nullptr ),
-  deferredInitRunnableStarted( false ),
-  optionalPartNom( 0 ),
-  articleNom( 0 )
+  deferredInitRunnableStarted( false )
 {
 
   ftsIdxName = indexFile + Dictionary::getFtsSuffix();
@@ -694,27 +690,27 @@ void DslDictionary::loadArticle( uint32_t address,
   }
 }
 
-string DslDictionary::dslToHtml( const std::u32string & str, const std::u32string & headword )
+string DslDictionary::dslToHtml( const std::u32string & str, const std::u32string & headword, RenderContext & context )
 {
   // Normalize the string
   std::u32string normalizedStr = Text::normalize( str );
-  currentHeadword              = headword;
+  context.currentHeadword      = headword;
 
   ArticleDom dom( normalizedStr, getName(), headword );
 
-  optionalPartNom = 0;
+  context.optionalPartNom = 0;
 
-  string html = processNodeChildren( dom.root );
+  string html = processNodeChildren( dom.root, context );
 
   return html;
 }
 
-string DslDictionary::processNodeChildren( const ArticleDom::Node & node )
+string DslDictionary::processNodeChildren( const ArticleDom::Node & node, RenderContext & context )
 {
   string result;
 
   for ( const auto & i : node ) {
-    result += nodeToHtml( i );
+    result += nodeToHtml( i, context );
   }
 
   return result;
@@ -739,7 +735,7 @@ string DslDictionary::getNodeLink( const ArticleDom::Node & node )
   return link;
 }
 
-string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
+string DslDictionary::nodeToHtml( const ArticleDom::Node & node, RenderContext & context )
 {
   string result;
 
@@ -764,13 +760,13 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
   }
 
   if ( node.tagName == U"b" ) {
-    result += "<b class=\"dsl_b\">" + processNodeChildren( node ) + "</b>";
+    result += "<b class=\"dsl_b\">" + processNodeChildren( node, context ) + "</b>";
   }
   else if ( node.tagName == U"i" ) {
-    result += "<i class=\"dsl_i\">" + processNodeChildren( node ) + "</i>";
+    result += "<i class=\"dsl_i\">" + processNodeChildren( node, context ) + "</i>";
   }
   else if ( node.tagName == U"u" ) {
-    string nodeText = processNodeChildren( node );
+    string nodeText = processNodeChildren( node, context );
 
     if ( nodeText.size() && isDslWs( nodeText[ 0 ] ) ) {
       result.push_back( ' ' ); // Fix a common problem where in "foo[i] bar[/i]"
@@ -781,32 +777,33 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
   }
   else if ( node.tagName == U"c" ) {
     if ( node.tagAttrs.empty() ) {
-      result += "<span class=\"c_default_color\">" + processNodeChildren( node ) + "</span>";
+      result += "<span class=\"c_default_color\">" + processNodeChildren( node, context ) + "</span>";
     }
     else {
-      result += "<font color=\"" + Html::escape( Text::toUtf8( node.tagAttrs ) ) + "\">" + processNodeChildren( node )
-        + "</font>";
+      result += "<font color=\"" + Html::escape( Text::toUtf8( node.tagAttrs ) ) + "\">"
+        + processNodeChildren( node, context ) + "</font>";
     }
   }
   else if ( node.tagName == U"*" ) {
-    string id = "O" + getId().substr( 0, 7 ) + "_" + QString::number( articleNom ).toStdString() + "_opt_"
-      + QString::number( optionalPartNom++ ).toStdString();
-    result += R"(<span class="dsl_opt" id=")" + id + "\">" + processNodeChildren( node ) + "</span>";
+    string id = "O" + getId().substr( 0, 7 ) + "_" + QString::number( context.articleNom ).toStdString() + "_opt_"
+      + QString::number( context.optionalPartNom++ ).toStdString();
+    result += R"(<span class="dsl_opt" id=")" + id + "\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"m" ) {
-    result += "<div class=\"dsl_m\">" + processNodeChildren( node ) + "</div>";
+    result += "<div class=\"dsl_m\">" + processNodeChildren( node, context ) + "</div>";
   }
   else if ( node.tagName.size() == 2 && node.tagName[ 0 ] == L'm' && iswdigit( node.tagName[ 1 ] ) ) {
-    result += "<div class=\"dsl_" + Text::toUtf8( node.tagName ) + "\">" + processNodeChildren( node ) + "</div>";
+    result +=
+      "<div class=\"dsl_" + Text::toUtf8( node.tagName ) + "\">" + processNodeChildren( node, context ) + "</div>";
   }
   else if ( node.tagName == U"trn" ) {
-    result += "<span class=\"dsl_trn\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_trn\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"ex" ) {
-    result += "<span class=\"dsl_ex\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_ex\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"com" ) {
-    result += "<span class=\"dsl_com\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_com\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"s" || node.tagName == U"video" ) {
     string filename = Filetype::simplifyString( Text::toUtf8( node.renderAsText() ), false );
@@ -823,7 +820,7 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
 
       string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-      result += addAudioLink( url.toEncoded(), getId() );
+      context.audio.consider( url.toEncoded() );
 
       result += "<span class=\"dsl_s_wav\"><a href=" + ref
         + R"(><img src="qrc:///icons/playsound.svg" border="0" align="absmiddle" alt="Play"/></a></span>)";
@@ -846,7 +843,7 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
       url.setPath( Utils::Url::ensureLeadingSlash( QString::fromUtf8( filename.c_str() ) ) );
 
       result += string( R"(<a class="dsl_s dsl_video" href=")" ) + url.toEncoded().data() + "\">"
-        + "<span class=\"img\"></span>" + "<span class=\"filename\">" + processNodeChildren( node ) + "</span>"
+        + "<span class=\"img\"></span>" + "<span class=\"filename\">" + processNodeChildren( node, context ) + "</span>"
         + "</a>";
     }
     else {
@@ -857,8 +854,8 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
       url.setHost( QString::fromUtf8( getId().c_str() ) );
       url.setPath( Utils::Url::ensureLeadingSlash( QString::fromUtf8( filename.c_str() ) ) );
 
-      result +=
-        string( R"(<a class="dsl_s" href=")" ) + url.toEncoded().data() + "\">" + processNodeChildren( node ) + "</a>";
+      result += string( R"(<a class="dsl_s" href=")" ) + url.toEncoded().data() + "\">"
+        + processNodeChildren( node, context ) + "</a>";
     }
   }
   else if ( node.tagName == U"url" ) {
@@ -880,10 +877,10 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
       }
     }
 
-    result += R"(<a class="dsl_url" href=")" + link + "\">" + processNodeChildren( node ) + "</a>";
+    result += R"(<a class="dsl_url" href=")" + link + "\">" + processNodeChildren( node, context ) + "</a>";
   }
   else if ( node.tagName == U"!trs" ) {
-    result += "<span class=\"dsl_trs\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_trs\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"p" ) {
     result += "<span class=\"dsl_p\"";
@@ -900,13 +897,13 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
       result += " title=\"" + Html::escape( title ) + "\"";
     }
 
-    result += ">" + processNodeChildren( node ) + "</span>";
+    result += ">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"'" ) {
     // There are two ways to display the stress: by adding an accent sign or via font styles.
     // We generate two spans, one with accented data and another one without it, so the
     // user could pick up the best suitable option.
-    string data = processNodeChildren( node );
+    string data = processNodeChildren( node, context );
     result += R"(<span class="dsl_stress"><span class="dsl_stress_without_accent">)" + data + "</span>"
       + "<span class=\"dsl_stress_with_accent\">" + data + Text::toUtf8( std::u32string( 1, 0x301 ) )
       + "</span></span>";
@@ -938,7 +935,7 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
         result += " lang=\"" + langcode + "\"";
       }
     }
-    result += ">" + processNodeChildren( node ) + "</span>";
+    result += ">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"ref" ) {
     QUrl url;
@@ -959,8 +956,8 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
       }
     }
 
-    result +=
-      string( R"(<a class="dsl_ref" href=")" ) + url.toEncoded().data() + "\">" + processNodeChildren( node ) + "</a>";
+    result += string( R"(<a class="dsl_ref" href=")" ) + url.toEncoded().data() + "\">"
+      + processNodeChildren( node, context ) + "</a>";
   }
   else if ( node.tagName == U"@" ) {
     // Special case - insided card header was not parsed
@@ -973,17 +970,17 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
     normalizeHeadword( nodeStr );
     url.setPath( Utils::Url::ensureLeadingSlash( QString::fromStdU32String( nodeStr ) ) );
 
-    result +=
-      string( R"(<a class="dsl_ref" href=")" ) + url.toEncoded().data() + "\">" + processNodeChildren( node ) + "</a>";
+    result += string( R"(<a class="dsl_ref" href=")" ) + url.toEncoded().data() + "\">"
+      + processNodeChildren( node, context ) + "</a>";
   }
   else if ( node.tagName == U"sub" ) {
-    result += "<sub>" + processNodeChildren( node ) + "</sub>";
+    result += "<sub>" + processNodeChildren( node, context ) + "</sub>";
   }
   else if ( node.tagName == U"sup" ) {
-    result += "<sup>" + processNodeChildren( node ) + "</sup>";
+    result += "<sup>" + processNodeChildren( node, context ) + "</sup>";
   }
   else if ( node.tagName == U"t" ) {
-    result += "<span class=\"dsl_t\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_t\">" + processNodeChildren( node, context ) + "</span>";
   }
   else if ( node.tagName == U"br" ) {
     result += "<br />";
@@ -993,13 +990,13 @@ string DslDictionary::nodeToHtml( const ArticleDom::Node & node )
               QString::fromStdU32String( node.tagName ).toUtf8().data(),
               QString::fromStdU32String( node.tagAttrs ).toUtf8().data(),
               getName().c_str(),
-              QString::fromStdU32String( currentHeadword ).toUtf8().data() );
+              QString::fromStdU32String( context.currentHeadword ).toUtf8().data() );
 
     result += "<span class=\"dsl_unknown\">[" + string( QString::fromStdU32String( node.tagName ).toUtf8().data() );
     if ( !node.tagAttrs.empty() ) {
       result += " " + string( QString::fromStdU32String( node.tagAttrs ).toUtf8().data() );
     }
-    result += "]" + processNodeChildren( node ) + "</span>";
+    result += "]" + processNodeChildren( node, context ) + "</span>";
   }
 
   return result;
@@ -1448,6 +1445,7 @@ void DslArticleRequest::run()
 
   std::u32string wordCaseFolded = Folding::applySimpleCaseOnly( word );
 
+  DslDictionary::RenderContext context{ audioLink, 0, 0, {} };
   for ( auto & x : chain ) {
     // Check if we're cancelled occasionally
     if ( Utils::AtomicInt::loadAcquire( isCancelled ) ) {
@@ -1477,7 +1475,7 @@ void DslArticleRequest::run()
         continue; // We already have this article in the body.
       }
 
-      dict.articleNom += 1;
+      context.articleNom += 1;
 
       if ( displayedHeadword.empty() || isDslWs( displayedHeadword[ 0 ] ) ) {
         displayedHeadword = word; // Special case - insided card
@@ -1494,7 +1492,7 @@ void DslArticleRequest::run()
         articleText += "<";                                                   // dslToHtml can't handle it correctly.
       }
       else {
-        articleText += dict.dslToHtml( displayedHeadword, displayedHeadword );
+        articleText += dict.dslToHtml( displayedHeadword, displayedHeadword, context );
       }
 
       /// After this may be expand button will be inserted
@@ -1509,12 +1507,12 @@ void DslArticleRequest::run()
       }
       articleAfter += ">";
 
-      articleAfter += dict.dslToHtml( articleBody, displayedHeadword );
+      articleAfter += dict.dslToHtml( articleBody, displayedHeadword, context );
       articleAfter += "</div>";
       articleAfter += "</div>";
 
-      if ( dict.hasHiddenZones() ) {
-        string prefix = "O" + dict.getId().substr( 0, 7 ) + "_" + QString::number( dict.articleNom ).toStdString();
+      if ( context.optionalPartNom != 0 ) {
+        string prefix = "O" + dict.getId().substr( 0, 7 ) + "_" + QString::number( context.articleNom ).toStdString();
         string id1    = prefix + "_expand";
         string id2    = "gd-" + dict.getId();
         string button = R"( <img src="qrc:///icons/expand_opt.svg" class="hidden_expand_opt" id=")" + id1
@@ -1641,11 +1639,13 @@ void DslResourceRequest::run()
 
     if ( !fp.empty() ) {
       File::loadFromFile( fp, data );
+      hasAnyData = true;
     }
     else if ( dict.resourceZip.isOpen() ) {
       if ( !dict.resourceZip.loadFile( Text::toUtf32( resourceName ), data ) ) {
         throw std::runtime_error( "Failed to load file from resource zip" );
       }
+      hasAnyData = true;
     }
     else {
       // 1. The sound dictionary specified via the #SOUND_DICTIONARY directive.

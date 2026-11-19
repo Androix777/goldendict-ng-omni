@@ -61,7 +61,7 @@ jobs:
         with:
           version: ${{ matrix.qt_ver }}
           arch: clang_64
-          modules: qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
+          modules: qthttpserver qtwebsockets qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
       - name: Build
         run: |
           mkdir build_dir
@@ -134,7 +134,7 @@ jobs:
         with:
           version: ${{ matrix.qt_ver }}
           arch: ${{ matrix.arch }}
-          modules: qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
+          modules: qthttpserver qtwebsockets qtwebengine qtwebchannel qtpositioning qt5compat qtmultimedia qtimageformats qtspeech
           # setup-python: 'false'
       - uses: actions/checkout@v6
         with:

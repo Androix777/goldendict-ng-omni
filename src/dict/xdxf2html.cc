@@ -67,7 +67,8 @@ string convert( const string & in,
                 Dictionary::Class * dictPtr,
                 bool isLogicalFormat,
                 unsigned revisionNumber,
-                QString * headword )
+                QString * headword,
+                ArticleAudioLink * audio )
 {
   // Convert spaces after each end of line to &nbsp;s, and then each end of
   // line to a <br>
@@ -657,7 +658,9 @@ string convert( const string & in,
 
           el_script.appendChild( dd.createTextNode( "" ) );
 
-          addAudioLink( string( "\"" ) + url.toEncoded().data() + "\"", dictPtr->getId() );
+          if ( audio ) {
+            audio->consider( url.toEncoded() );
+          }
 
           QDomElement el_span = dd.createElement( "span" );
           el_span.setAttribute( "class", "xdxf_wav" );

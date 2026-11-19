@@ -260,6 +260,7 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
     return std::make_shared< Dictionary::DataRequestInstant >( false ); // No such word
   }
 
+  auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
   string result;
 
   multimap< std::u32string, string >::const_iterator i;
@@ -275,7 +276,7 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + i->second + "</a>";
@@ -292,7 +293,7 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
 
     string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-    result += addAudioLink( url.toEncoded(), getId() );
+    ret->audioLink.consider( url.toEncoded() );
 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + i->second + "</a>";
@@ -301,13 +302,12 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
 
   result += "</div>";
 
-  auto * ret = new Dictionary::DataRequestInstant( true );
 
   ret->getData().resize( result.size() );
 
   memcpy( &( ret->getData().front() ), result.data(), result.size() );
 
-  return std::shared_ptr< Dictionary::DataRequestInstant >( ret );
+  return ret;
 }
 
 /// This wraps around file operations

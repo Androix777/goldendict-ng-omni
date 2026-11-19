@@ -30,6 +30,9 @@
 #include "base_type.hh"
 #include "hotkey/hotkeywrapper.hh"
 #include "resourceschemehandler.hh"
+#ifdef WITH_WEB_VIEWER
+class LocalWebServer;
+#endif
 #ifdef WITH_X11
   #include <fixx11h.h>
 #endif
@@ -153,6 +156,10 @@ private:
   /// Here we store unmuted dictionaries when the dictionary bar is active
   vector< sptr< Dictionary::Class > > dictionariesUnmuted;
   Instances::Groups groupInstances;
+#ifdef WITH_WEB_VIEWER
+  std::unique_ptr< LocalWebServer > webServer;
+  void openWebViewer();
+#endif
   ArticleMaker articleMaker;
   ArticleNetworkAccessManager articleNetMgr;
   QNetworkAccessManager dictNetMgr; // We give dictionaries a separate manager,

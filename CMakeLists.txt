@@ -77,6 +77,11 @@ if (WITH_TTS)
 endif ()
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS ${GD_QT_COMPONENTS})
+find_package(Qt6HttpServer QUIET)
+option(WITH_WEB_VIEWER "Build the local browser viewer (requires Qt HTTP Server)" ${Qt6HttpServer_FOUND})
+if (WITH_WEB_VIEWER AND NOT TARGET Qt6::HttpServer)
+    message(FATAL_ERROR "WITH_WEB_VIEWER requires Qt6::HttpServer")
+endif ()
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON) # not included in the qt_standard_project_setup
@@ -152,6 +157,12 @@ target_sources(${GOLDENDICT} PRIVATE
         ${WINDOWS_ICON_RC}
 )
 
+
+if (WITH_WEB_VIEWER)
+    target_compile_definitions(${GOLDENDICT} PRIVATE WITH_WEB_VIEWER)
+    target_link_libraries(${GOLDENDICT} PRIVATE Qt6::HttpServer)
+    target_sources(${GOLDENDICT} PRIVATE src/web/viewer.qrc)
+endif ()
 
 ### Common parts amount all platforms
 

@@ -11,6 +11,7 @@
 #include <QWaitCondition>
 #include <QGuiApplication>
 
+#include "audiolink.hh"
 #include "config.hh"
 #include "ex.hh"
 #include "langcoder.hh"
@@ -198,6 +199,9 @@ class DataRequest: public Request
   Q_OBJECT
 
 public:
+  /// Produced alongside the HTML. Read only after the request finishes.
+  ArticleAudioLink audioLink;
+
   /// Returns the number of bytes read, with a -1 meaning that so far it's
   /// uncertain whether resource even exists or not, and any non-negative value
   /// meaning that that amount of bytes is not available.

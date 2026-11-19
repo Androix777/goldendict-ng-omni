@@ -108,6 +108,7 @@ class EpwingBook
   QByteArray codeToUnicode( const QString & code );
 
 public:
+  ArticleAudioLink * articleAudio = nullptr; // Only set while holding getLibMutex().
   const char *codec_ISO_name, *codec_GB_name, *codec_Euc_name;
 
   enum DecorationCodes {

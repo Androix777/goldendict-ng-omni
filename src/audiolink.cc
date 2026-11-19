@@ -2,18 +2,11 @@
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 
 #include "audiolink.hh"
-#include "globalbroadcaster.hh"
+#include "utils.hh"
 
-std::string addAudioLink( const std::string & url, const std::string & dictionaryId )
+void ArticleAudioLink::consider( const QString & url )
 {
-  return addAudioLink( QString::fromStdString( url ), dictionaryId );
-}
-
-std::string addAudioLink( const QString & url, const std::string & dictionaryId )
-{
-  if ( url.isEmpty() ) {
-    return {};
+  if ( first.isEmpty() && Utils::Url::isAudioUrl( QUrl( url ) ) ) {
+    first = url;
   }
-  GlobalBroadcaster::instance()->pronounce_engine.sendAudio( dictionaryId, url );
-  return "";
 }

@@ -85,7 +85,6 @@ class ForvoArticleRequest: public Dictionary::DataRequest
   using NetReplies = std::list< NetReply >;
   NetReplies netReplies;
   QString apiKey, languageCode;
-  string dictionaryId;
 
 public:
 
@@ -93,7 +92,6 @@ public:
                        const vector< std::u32string > & alts,
                        const QString & apiKey_,
                        const QString & languageCode_,
-                       const string & dictionaryId_,
                        QNetworkAccessManager & mgr );
 
   void cancel() override;
@@ -118,7 +116,7 @@ sptr< DataRequest > ForvoDictionary::getArticle( const std::u32string & word,
     return std::make_shared< DataRequestInstant >( false );
   }
   else {
-    return std::make_shared< ForvoArticleRequest >( word, alts, apiKey, languageCode, getId(), netMgr );
+    return std::make_shared< ForvoArticleRequest >( word, alts, apiKey, languageCode, netMgr );
   }
 }
 
@@ -143,11 +141,9 @@ ForvoArticleRequest::ForvoArticleRequest( const std::u32string & str,
                                           const vector< std::u32string > & alts,
                                           const QString & apiKey_,
                                           const QString & languageCode_,
-                                          const string & dictionaryId_,
                                           QNetworkAccessManager & mgr ):
   apiKey( apiKey_ ),
-  languageCode( languageCode_ ),
-  dictionaryId( dictionaryId_ )
+  languageCode( languageCode_ )
 {
   connect( &mgr, &QNetworkAccessManager::finished, this, &ForvoArticleRequest::requestFinished, Qt::QueuedConnection );
 
@@ -251,7 +247,7 @@ void ForvoArticleRequest::requestFinished( QNetworkReply * r )
 
                 string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
-                articleBody += addAudioLink( url.toEncoded(), dictionaryId ).c_str();
+                audioLink.consider( url.toEncoded() );
 
                 bool isMale = ( item.namedItem( "sex" ).toElement().text().toLower() != "f" );
 

@@ -3,8 +3,7 @@
 
 #pragma once
 
-#include <set>
-#include <list>
+#include "article_lookup.hh"
 #include "config.hh"
 #include "dict/dictionary.hh"
 #include "instances.hh"
@@ -88,14 +87,8 @@ class ArticleRequest: public Dictionary::DataRequest
 
   QString word;
   Instances::Group group;
-  QMap< QString, QString > contexts;
   std::vector< sptr< Dictionary::Class > > activeDicts;
-
-  std::set< std::u32string, std::less<> > alts; // Accumulated main forms
-  std::list< sptr< Dictionary::WordSearchRequest > > altSearches;
-  std::list< sptr< Dictionary::DataRequest > > bodyRequests;
-  bool altsDone{ false };
-  bool bodyDone{ false };
+  ArticleLookup lookup;
   bool foundAnyDefinitions{ false };
   bool morphologyOnly{ false };         // The group has no article-providing dictionaries
   sptr< WordFinder > stemmedWordFinder; // Used when there're no results
@@ -116,7 +109,6 @@ class ArticleRequest: public Dictionary::DataRequest
   bool firstCompoundWasFound;
   int articleSizeLimit;
   bool needExpandOptionalParts;
-  bool ignoreDiacritics;
 
 public:
 
@@ -134,8 +126,7 @@ public:
 
 private slots:
 
-  void altSearchFinished();
-  void bodyFinished();
+  void renderArticles( const std::vector< ArticleLookup::Result > & results, bool complete );
   void stemmedSearchFinished();
   void individualWordFinished();
 

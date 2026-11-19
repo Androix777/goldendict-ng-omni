@@ -36,7 +36,6 @@ class LinguaArticleRequest: public Dictionary::DataRequest
   using NetReplies = std::list< NetReply >;
   NetReplies netReplies;
   QString languageCode, langWikipediaID;
-  string dictionaryId;
 
 public:
 
@@ -44,7 +43,6 @@ public:
                         const vector< std::u32string > & alts,
                         const QString & languageCode_,
                         const QString & langWikipediaID_,
-                        const string & dictionaryId_,
                         QNetworkAccessManager & mgr );
 
   void cancel() override;
@@ -190,7 +188,7 @@ WHERE {
                                   bool ) override
   {
     if ( word.size() < 50 ) {
-      return std::make_shared< LinguaArticleRequest >( word, alts, languageCode, langWikipediaID, getId(), netMgr );
+      return std::make_shared< LinguaArticleRequest >( word, alts, languageCode, langWikipediaID, netMgr );
     }
     else {
       return std::make_shared< DataRequestInstant >( false );
@@ -238,7 +236,6 @@ LinguaArticleRequest::LinguaArticleRequest( const std::u32string & str,
                                             const vector< std::u32string > & alts,
                                             const QString & languageCode_,
                                             const QString & langWikipediaID,
-                                            const string & dictionaryId_,
                                             QNetworkAccessManager & mgr ):
   languageCode( languageCode_ ),
   langWikipediaID( langWikipediaID )
@@ -349,7 +346,7 @@ void LinguaArticleRequest::requestFinished( QNetworkReply * r )
       string title     = pageJsonObj[ "title" ].toString().toHtmlEscaped().toStdString();
       string audiolink =
         pageJsonObj[ "imageinfo" ].toArray().at( 0 ).toObject()[ "url" ].toString().toHtmlEscaped().toStdString();
-      addAudioLink( audiolink, dictionaryId );
+      audioLink.consider( QString::fromStdString( audiolink ) );
 
       articleBody += "<div class=\"audio-play-item\">";
       //play icon

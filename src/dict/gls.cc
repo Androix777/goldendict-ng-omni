@@ -403,13 +403,13 @@ private:
 
   /// Loads the article, storing its headword and formatting the data it has
   /// into an html.
-  void loadArticle( uint32_t address, string & headword, string & articleText );
+  void loadArticle( uint32_t address, string & headword, string & articleText, ArticleAudioLink & audio );
 
   /// Loads the article
   void loadArticleText( uint32_t address, vector< string > & headwords, string & articleText );
 
   /// Process resource links (images, audios, etc)
-  QString & filterResource( QString & article );
+  QString & filterResource( QString & article, ArticleAudioLink & audio );
 
   friend class GlsResourceRequest;
   friend class GlsArticleRequest;
@@ -623,7 +623,7 @@ void GlsDictionary::loadArticleText( uint32_t address, vector< string > & headwo
   }
 }
 
-void GlsDictionary::loadArticle( uint32_t address, string & headword, string & articleText )
+void GlsDictionary::loadArticle( uint32_t address, string & headword, string & articleText, ArticleAudioLink & audio )
 {
   string articleBody;
   vector< string > headwords;
@@ -660,7 +660,7 @@ void GlsDictionary::loadArticle( uint32_t address, string & headword, string & a
 
   QString text = QString::fromUtf8( articleBody.c_str(), articleBody.size() );
 
-  article += filterResource( text );
+  article += filterResource( text, audio );
 
   if ( isToLanguageRTL() ) {
     article += "</div>";
@@ -671,7 +671,7 @@ void GlsDictionary::loadArticle( uint32_t address, string & headword, string & a
   articleText = string( article.toUtf8().data() );
 }
 
-QString & GlsDictionary::filterResource( QString & article )
+QString & GlsDictionary::filterResource( QString & article, ArticleAudioLink & audio )
 {
   QRegularExpression imgRe( R"((<\s*(?:img|script)\s+[^>]*src\s*=\s*["']?)(?!(?:data|https?|ftp|qrcx):))",
                             QRegularExpression::CaseInsensitiveOption );
@@ -751,8 +751,8 @@ QString & GlsDictionary::filterResource( QString & article )
       std::string audioLink = "gdau://" + getId() + "/" + src.toUtf8().data();
       std::string href      = "\"" + audioLink + "\"";
 
-      QString newTag = QString::fromUtf8(
-        ( addAudioLink( audioLink, getId() ) + "<span class=\"gls_wav\"><a href=" + href + ">" ).c_str() );
+      audio.consider( QString::fromStdString( audioLink ) );
+      QString newTag = QString::fromUtf8( ( "<span class=\"gls_wav\"><a href=" + href + ">" ).c_str() );
       newTag += match.captured( 4 );
       if ( match.captured( 4 ).indexOf( "<img " ) < 0 ) {
         newTag += R"( <img src="qrc:///icons/playsound.svg" border="0" alt="Play">)";
@@ -958,7 +958,7 @@ void GlsArticleRequest::run()
 
       string headword, articleText;
 
-      dict.loadArticle( x.articleOffset, headword, articleText );
+      dict.loadArticle( x.articleOffset, headword, articleText, audioLink );
 
       // Ok. Now, does it go to main articles, or to alternate ones? We list
       // main ones first, and alternates after.

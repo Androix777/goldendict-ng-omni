@@ -25,8 +25,9 @@ string convert( const string &,
                 DICT_TYPE type,
                 const map< string, string > * pAbrv,
                 Dictionary::Class * dictPtr,
-                bool isLogicalFormat    = false,
-                unsigned revisionNumber = 0,
-                QString * headword      = 0 );
+                bool isLogicalFormat     = false,
+                unsigned revisionNumber  = 0,
+                QString * headword       = 0,
+                ArticleAudioLink * audio = nullptr );
 
 } // namespace Xdxf2Html

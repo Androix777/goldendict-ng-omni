@@ -197,7 +197,8 @@ protected:
 private:
 
   // Loads the article, storing its headword and formatting article's data into an html.
-  void loadArticle( uint32_t address, string & articleText, QString * headword = 0 );
+  void
+  loadArticle( uint32_t address, string & articleText, QString * headword = 0, ArticleAudioLink * audio = nullptr );
 
   friend class XdxfArticleRequest;
   friend class XdxfResourceRequest;
@@ -482,7 +483,7 @@ void XdxfArticleRequest::run()
     headword = x.word;
 
     try {
-      dict.loadArticle( x.articleOffset, articleText );
+      dict.loadArticle( x.articleOffset, articleText, nullptr, &audioLink );
 
       // Ok. Now, does it go to main articles, or to alternate ones? We list
       // main ones first, and alternates after.
@@ -550,7 +551,7 @@ sptr< Dictionary::DataRequest > XdxfDictionary::getArticle( const std::u32string
   return std::make_shared< XdxfArticleRequest >( word, alts, *this, ignoreDiacritics );
 }
 
-void XdxfDictionary::loadArticle( uint32_t address, string & articleText, QString * headword )
+void XdxfDictionary::loadArticle( uint32_t address, string & articleText, QString * headword, ArticleAudioLink * audio )
 {
   // Read the properties
 
@@ -599,7 +600,8 @@ void XdxfDictionary::loadArticle( uint32_t address, string & articleText, QStrin
                                     this,
                                     fType == Logical,
                                     idxHeader.revisionNumber,
-                                    headword );
+                                    headword,
+                                    audio );
 
   free( articleBody );
 }

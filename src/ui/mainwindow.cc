@@ -1,3 +1,6 @@
+#ifdef WITH_WEB_VIEWER
+  #include "web/local_web_server.hh"
+#endif
 /* This file is (c) 2008-2012 Konstantin Isakov <ikm@goldendict.org>
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 
@@ -33,6 +36,7 @@
 #include <QCursor>
 #include <QCloseEvent>
 #include <QDesktopServices>
+#include <QScopeGuard>
 #include <QCryptographicHash>
 #include <QFileDialog>
 #include <QPrinter>
@@ -323,6 +327,21 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
 #endif
 
   ui.setupUi( this );
+#ifdef WITH_WEB_VIEWER
+  auto openViewer = new QAction( tr( "&Open Local Browser Viewer" ), this );
+  auto stopViewer = new QAction( tr( "Stop Local Browser Viewer" ), this );
+  ui.menuFile->insertAction( ui.rescanFiles, openViewer );
+  ui.menuFile->insertAction( ui.rescanFiles, stopViewer );
+  stopViewer->setVisible( false );
+  connect( openViewer, &QAction::triggered, this, [ this, stopViewer ] {
+    openWebViewer();
+    stopViewer->setVisible( bool( webServer ) );
+  } );
+  connect( stopViewer, &QAction::triggered, this, [ this, stopViewer ] {
+    webServer.reset();
+    stopViewer->setVisible( false );
+  } );
+#endif
 
   // Set own gesture recognizers
 #ifndef Q_OS_MACOS
@@ -1370,6 +1389,9 @@ void MainWindow::mousePressEvent( QMouseEvent * event )
 
 MainWindow::~MainWindow()
 {
+#ifdef WITH_WEB_VIEWER
+  webServer.reset();
+#endif
   closeHeadwordsDialog();
 
   ftsIndexing.stopIndexing();
@@ -2515,6 +2537,16 @@ void MainWindow::updatePronounceAvailability()
 
 void MainWindow::editDictionaries( unsigned editDictionaryGroup )
 {
+#ifdef WITH_WEB_VIEWER
+  if ( webServer ) {
+    webServer->setCatalogAvailable( false );
+  }
+  const auto resumeViewer = qScopeGuard( [ this ] {
+    if ( webServer ) {
+      webServer->setCatalogAvailable( true );
+    }
+  } );
+#endif
   hotkeyWrapper.reset(); // No hotkeys while we're editing dictionaries
   closeHeadwordsDialog();
   closeFullTextSearchDialog();
@@ -3981,6 +4013,16 @@ void MainWindow::on_saveArticle_triggered()
 
 void MainWindow::on_rescanFiles_triggered()
 {
+#ifdef WITH_WEB_VIEWER
+  if ( webServer ) {
+    webServer->setCatalogAvailable( false );
+  }
+  const auto resumeViewer = qScopeGuard( [ this ] {
+    if ( webServer ) {
+      webServer->setCatalogAvailable( true );
+    }
+  } );
+#endif
   hotkeyWrapper.reset(); // No hotkeys while we're editing dictionaries
   closeHeadwordsDialog();
   closeFullTextSearchDialog();
@@ -4892,6 +4934,34 @@ void MainWindow::openWebsiteInNewTab( QString name, QString url, QString dictId,
 
   view->load( url, name );
 }
+
+#ifdef WITH_WEB_VIEWER
+void MainWindow::openWebViewer()
+{
+  if ( !webServer ) {
+    auto server = std::make_unique< LocalWebServer >( groupInstances, cfg );
+    if ( !server->listen() ) {
+      QMessageBox::warning( this,
+                            tr( "Browser viewer" ),
+                            tr( "Could not start the local HTTP listener on 127.0.0.1:18742." ) );
+      return;
+    }
+    webServer = std::move( server );
+  }
+  QUrl url = webServer->url();
+  QUrlQuery query;
+  query.addQueryItem( "group", QString::number( groupList->getCurrentGroup() ) );
+  if ( auto view = getCurrentArticleView(); view && view->page()->url().scheme() == "gdlookup" ) {
+    query.addQueryItem(
+      "word",
+      QString::fromLatin1( QUrl::toPercentEncoding( Utils::Url::getQueryWord( view->page()->url() ).second ) ) );
+  }
+  url.setQuery( query );
+  if ( !QDesktopServices::openUrl( url ) ) {
+    QMessageBox::information( this, tr( "Browser viewer" ), tr( "Open %1 in your browser." ).arg( url.toString() ) );
+  }
+}
+#endif
 
 void MainWindow::openCurrentTabInExternalBrowser()
 {
