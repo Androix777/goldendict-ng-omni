@@ -267,6 +267,7 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
 
   result += "<div class=\"audio-play\">";
   for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
 
     QUrl url;
@@ -281,9 +282,11 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + i->second + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
 
     QUrl url;
@@ -298,6 +301,7 @@ sptr< Dictionary::DataRequest > LsaDictionary::getArticle( const std::u32string 
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + i->second + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   result += "</div>";

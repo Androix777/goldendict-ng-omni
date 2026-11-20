@@ -1120,17 +1120,21 @@ void SlobArticleRequest::run()
   multimap< std::u32string, pair< string, string > >::const_iterator i;
 
   for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+    const auto start = result.size();
     result += R"(<div class="slobdict"><h3 class="slobdict_headword">)";
     result += i->second.first;
     result += "</h3></div>";
     result += i->second.second;
+    recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+    const auto start = result.size();
     result += R"(<div class="slobdict"><h3 class="slobdict_headword">)";
     result += i->second.first;
     result += "</h3></div>";
     result += i->second.second;
+    recordArticle( start, result.size() );
   }
 
   appendString( result );

@@ -589,7 +589,9 @@ void MdxArticleRequest::run()
 
     // See Issue #271: A mechanism to clean-up invalid HTML cards.
     string cleaner = Utils::Html::getHtmlCleaner();
+    const auto start = articleText.size();
     articleText += "<div class=\"mdict\">" + articleBody + cleaner + "</div>\n";
+    recordArticle( start, articleText.size() );
   }
 
   if ( !articleText.empty() ) {

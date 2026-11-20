@@ -253,6 +253,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
     string displayedName =
       mainArticles.size() + alternateArticles.size() > 1 ? name : Text::toUtf8( stripExtension( name ) );
 
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
 
     QUrl url;
@@ -267,6 +268,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + Html::escape( displayedName ) + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
@@ -295,6 +297,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
     string displayedName =
       mainArticles.size() + alternateArticles.size() > 1 ? name : Text::toUtf8( stripExtension( name ) );
 
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
 
     QUrl url;
@@ -309,6 +312,7 @@ sptr< Dictionary::DataRequest > ZipSoundsDictionary::getArticle( const std::u32s
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + Html::escape( displayedName ) + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   result += "</div>";

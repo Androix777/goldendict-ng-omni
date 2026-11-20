@@ -317,6 +317,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
       displayedName = name.toStdString();
     }
 
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
     auto _displayName = Html::escape( displayedName );
     QString file_name;
@@ -337,6 +338,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + _displayName + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
@@ -354,6 +356,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
       displayedName = name.toStdString();
     }
 
+    const auto start = result.size();
     result += "<div class=\"audio-play-item\">";
     auto _displayName = Html::escape( displayedName );
     QString file_name;
@@ -374,6 +377,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( const std::u32st
     result += "<a href=" + ref + R"( class="audio-play-icon"></a>)";
     result += "<a href=" + ref + ">" + _displayName + "</a>";
     result += "</div>";
+    ret->recordArticle( start, result.size() );
   }
 
   result += "</div>";

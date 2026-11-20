@@ -220,12 +220,20 @@ public:
   /// done, this can only be called after the request has finished.
   vector< char > & getFullData();
 
+  /// Byte range of one source entry in the final UTF-8 article. Call in output order.
+  void recordArticle( size_t begin, size_t end );
+  /// Returns standalone entries, including any shared outer markup. Read after finish().
+  QStringList getArticleFragments();
+
 signals:
   void finishedArticle( QString articleText );
 
 protected:
   bool hasAnyData = false; // With this being false, dataSize() always returns -1
   vector< char > data;
+
+private:
+  vector< std::pair< size_t, size_t > > articleRanges;
 };
 
 /// A helper class for synchronous word search implementations.

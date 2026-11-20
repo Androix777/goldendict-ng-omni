@@ -161,6 +161,29 @@ vector< char > & DataRequest::getFullData()
   return data;
 }
 
+void DataRequest::recordArticle( size_t begin, size_t end )
+{
+  articleRanges.emplace_back( begin, end );
+}
+
+QStringList DataRequest::getArticleFragments()
+{
+  const auto & bytes = getFullData();
+  if ( bytes.empty() || articleRanges.size() < 2 ) {
+    return { QString::fromUtf8( bytes.data(), bytes.size() ) };
+  }
+  // EPWING and audio dictionaries wrap the whole response in a shared container.
+  const QString prefix = QString::fromUtf8( bytes.data(), articleRanges.front().first );
+  const size_t lastEnd = articleRanges.back().second;
+  const QString suffix = QString::fromUtf8( bytes.data() + lastEnd, bytes.size() - lastEnd );
+  QStringList entries;
+  entries.reserve( articleRanges.size() );
+  for ( const auto & [ begin, end ] : articleRanges ) {
+    entries.append( prefix + QString::fromUtf8( bytes.data() + begin, end - begin ) + suffix );
+  }
+  return entries;
+}
+
 Class::Class( const string & id_, const vector< string > & dictionaryFiles_ ):
   id( id_ ),
   dictionaryFiles( dictionaryFiles_ ),

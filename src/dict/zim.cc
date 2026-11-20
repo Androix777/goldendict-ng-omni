@@ -694,21 +694,25 @@ void ZimArticleRequest::run()
 
 
   for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+    const auto start = result.size();
     result += "<div class=\"zimdict\">";
     result += "<h2 class=\"zimdict_headword\">";
     result += i->second.first;
     result += "</h2>";
     result += i->second.second;
     result += cleaner + "</div>";
+    recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+    const auto start = result.size();
     result += "<div class=\"zimdict\">";
     result += "<h2 class=\"zimdict_headword\">";
     result += i->second.first;
     result += "</h2>";
     result += i->second.second;
     result += cleaner + "</div>";
+    recordArticle( start, result.size() );
   }
 
   appendString( result );

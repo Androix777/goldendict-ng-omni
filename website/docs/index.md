@@ -31,10 +31,14 @@ The browser viewer also serves a read-only JSON API at `http://127.0.0.1:18742/a
 | GET endpoint | Response |
 | --- | --- |
 | `groups` | `groups` array with numeric `id` and `name`, including the built-in All group. |
-| `dictionaries` or `dictionaries?group=ID` | `dictionaries` array in group order. Each local dictionary has a string `id`, `name` and group-specific `enabled` flag. |
+| `dictionaries` or `dictionaries?group=ID` | `dictionaries` array in group order. Each local dictionary has a string `id`, `name`, group-specific `enabled` flag, `articleCount`, `wordCount` (backend counts including aliases where applicable) and `fileSizeBytes`. The size sums the files reported by the backend, including registered resource volumes such as MDD, excluding GoldenDict's generated indexes. It is `null` if the file total is unavailable. |
+| `dictionaries?dictionary=ID` | A one-item `dictionaries` array with the same metadata plus the dictionary's plain-text `description` (`null` if absent), `headwordStatus` (`ready`, `unavailable` or `unsupported`) and `headwordCount` (exact number of indexed headings when ready, otherwise `null`). An optional `group` selects the group for membership and enabled status. |
+| `headwords?dictionary=ID` | Browse the existing headword index of one enabled local dictionary. Returns `dictionaryId`, `total`, `headwords` (objects with `index` and `word`), and `nextOffset`. |
 | `lookup?word=WORD` | The query in `word` and an `articles` array. Use `group=ID` to select a group or `dictionary=ID` to select one enabled dictionary from All. The default is all enabled local dictionaries in All. |
 
 Each article contains `dictionaryId` and `dictionaryName`. A dictionary that reports a lookup failure also has an `error` field in its result.
+
+Each matching source record has its own object in `articles`, for both HTML and text. Two homonyms from the same dictionary share a `dictionaryId` and have separate content. Senses stored together in one record stay together. Results follow dictionary order, then entry order within each dictionary.
 
 - `format=html` (default) returns `html`, the UTF-8 fragment produced by the dictionary backend, including dictionary markup and GoldenDict resource links such as `bres://` and `gdau://`.
 - `format=text` returns `text` and a `warnings` array for each article. The renderer uses dictionary styles to retain sense numbers, examples, readings and table divisions. Inline images without a label may become `[glyph]` and larger images `[image]`. The warning `primarily-visual` indicates that images dominate the available text. The renderer also reports `image-without-text`, `stylesheet-unavailable` and `empty-text` when applicable.
@@ -49,6 +53,16 @@ $result.articles | Select-Object dictionaryName, text, warnings
 A word with no matches returns HTTP 200 and an empty `articles` array. Missing or invalid parameters return 400, and an unknown group or unavailable dictionary returns 404. The server can return 503 while reloading its catalog and 504 when a lookup times out. Errors use a JSON object with an `error` message.
 
 GoldenDict renders text in its built-in Qt WebEngine using an isolated, off-screen page. Unrecognized CSS numbering styles use a decimal fallback and report `unsupported-css-counter`. An unsupported generated label expression reports `unsupported-css-content`. Up to two text renders can run concurrently. A busy renderer returns HTTP 503. A render that exceeds two minutes returns HTTP 504.
+
+### Finding a word in an unfamiliar dictionary
+
+Take an enabled dictionary's `id` from the catalog. To discover entries, use any of these GET requests relative to `/api/v1/`:
+
+- `headwords?dictionary=ID&mode=sample&limit=5` returns up to five actual headings spaced evenly through the index. Pass any returned `word` to `lookup` with the same dictionary ID.
+- `headwords?dictionary=ID&indices=7,0,7` reads those exact positions in the requested order, including repeats. Valid positions are **0** through **headwordCount − 1**. Use `headwordCount` from the dictionary details or `total` from a headword response. The backend's `wordCount` can differ. An out-of-range position rejects the entire request with HTTP 400.
+- `headwords?dictionary=ID&offset=0&limit=20` reads a page in index order. Continue at `nextOffset` until it is `null`. An offset at or past the end returns an empty page.
+
+Pages and samples default to 20 headings and accept limits from 1 to 100. A request for specific indices accepts up to 100 positions and cannot include pagination or sampling parameters. Index positions belong to the current dictionary version and can change after an update. Headword browsing returns 503 if the index is unavailable and 501 if the backend does not support indexed browsing.
 
 ## Screenshots
 

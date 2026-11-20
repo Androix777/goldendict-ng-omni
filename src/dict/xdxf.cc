@@ -520,19 +520,23 @@ void XdxfArticleRequest::run()
   string cleaner = Utils::Html::getHtmlCleaner();
 
   for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+    const auto start = result.size();
     //      result += "<h3>";
     //      result += i->second.first;
     //      result += "</h3>";
     result += i->second.second;
     result += cleaner;
+    recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+    const auto start = result.size();
     //      result += "<h3>";
     //      result += i->second.first;
     //      result += "</h3>";
     result += i->second.second;
     result += cleaner;
+    recordArticle( start, result.size() );
   }
 
   appendString( result );

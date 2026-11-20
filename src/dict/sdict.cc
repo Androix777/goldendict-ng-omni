@@ -533,13 +533,16 @@ void SdictArticleRequest::run()
   multimap< std::u32string, pair< string, string > >::const_iterator i;
 
   for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+    const auto start = result.size();
     result += dict.isFromLanguageRTL() ? "<h3 dir=\"rtl\">" : "<h3>";
     result += i->second.first;
     result += "</h3>";
     result += i->second.second;
+    recordArticle( start, result.size() );
   }
 
   for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+    const auto start = result.size();
     result += dict.isFromLanguageRTL() ? "<h3 dir=\"rtl\">" : "<h3>";
     result += i->second.first;
     result += "</h3>";
@@ -550,6 +553,7 @@ void SdictArticleRequest::run()
     if ( dict.isToLanguageRTL() ) {
       result += "</span>";
     }
+    recordArticle( start, result.size() );
   }
 
   appendString( result );

@@ -1413,6 +1413,7 @@ void StardictArticleRequest::run()
     string cleaner = Utils::Html::getHtmlCleaner();
 
     for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+      const auto start = result.size();
       result += dict.isFromLanguageRTL() ? R"(<h3 class="sdct_headwords" dir="rtl">)" : "<h3 class=\"sdct_headwords\">";
       result += i->second.first;
       result += "</h3>";
@@ -1424,9 +1425,11 @@ void StardictArticleRequest::run()
       if ( dict.isToLanguageRTL() ) {
         result += "</div>";
       }
+      recordArticle( start, result.size() );
     }
 
     for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+      const auto start = result.size();
       result += dict.isFromLanguageRTL() ? R"(<h3 class="sdct_headwords" dir="rtl">)" : "<h3 class=\"sdct_headwords\">";
       result += i->second.first;
       result += "</h3>";
@@ -1438,6 +1441,7 @@ void StardictArticleRequest::run()
       if ( dict.isToLanguageRTL() ) {
         result += "</div>";
       }
+      recordArticle( start, result.size() );
     }
 
     appendString( result );

@@ -721,80 +721,67 @@ void BglArticleRequest::run()
     return;
   }
 
-  string result;
-
-  multimap< std::u32string, pair< string, string > >::const_iterator i;
-
-  string cleaner = Utils::Html::getHtmlCleaner();
-  for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+  string html;
+  const auto cleaner     = Utils::Html::getHtmlCleaner();
+  const auto appendEntry = [&]( const pair< string, string > & entry ) {
+    string result;
     if ( dict.isFromLanguageRTL() ) { // RTL support
       result += "<h3 style=\"text-align:right;direction:rtl\">";
     }
     else {
       result += "<h3>";
     }
-    result += postfixToSuperscript( i->second.first );
+    result += postfixToSuperscript( entry.first );
     result += "</h3>";
     if ( dict.isToLanguageRTL() ) {
-      result += "<div class=\"bglrtl\">" + i->second.second + "</div>";
+      result += "<div class=\"bglrtl\">" + entry.second + "</div>";
     }
     else {
-      result += "<div>" + i->second.second + "</div>";
+      result += "<div>" + entry.second + "</div>";
     }
     result += cleaner;
+
+    // Do some cleanups in the text
+
+    BglDictionary::replaceCharsetEntities( result );
+
+    result =
+      QString::fromUtf8( result.c_str() )
+        // onclick location to link
+        .replace( QRegularExpression(
+                    R"(<([a-z0-9]+)\s+[^>]*onclick="[a-z.]*location(?:\.href)\s*=\s*'([^']+)[^>]*>([^<]+)</\1>)",
+                    QRegularExpression::CaseInsensitiveOption ),
+                  R"(<a href="\2">\3</a>)" )
+        .replace(
+          QRegularExpression( R"((<\s*a\s+[^>]*href\s*=\s*["']\s*)bword://)", QRegularExpression::CaseInsensitiveOption ),
+          "\\1bword:" )
+        //remove invalid width, height attrs
+        .replace( QRegularExpression( R"((width|height)\s*=\s*["']\d{7,}["''])" ), "" )
+        //remove invalid <br> tag
+        .replace(
+          QRegularExpression(
+            R"(<br>(<div|<table|<tbody|<tr|<td|</div>|</table>|</tbody>|</tr>|</td>|function addScript|var scNode|scNode|var atag|while\(atag|atag=atag|document\.getElementsByTagName|addScript|src="bres|<a onmouseover="return overlib|onclick="return overlib))",
+            QRegularExpression::CaseInsensitiveOption ),
+          "\\1" )
+        .replace(
+          QRegularExpression(
+            R"((AUTOSTATUS, WRAP\);" |</DIV>|addScript\('JS_FILE_PHONG_VT_45634'\);|appendChild\(scNode\);|atag\.firstChild;)<br>)",
+            QRegularExpression::CaseInsensitiveOption ),
+          " \\1 " )
+        .toUtf8()
+        .data();
+    const auto start = html.size();
+    html += result;
+    recordArticle( start, html.size() );
+  };
+  for ( const auto & entry : mainArticles ) {
+    appendEntry( entry.second );
+  }
+  for ( const auto & entry : alternateArticles ) {
+    appendEntry( entry.second );
   }
 
-
-  for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
-    if ( dict.isFromLanguageRTL() ) { // RTL support
-      result += "<h3 style=\"text-align:right;direction:rtl\">";
-    }
-    else {
-      result += "<h3>";
-    }
-    result += postfixToSuperscript( i->second.first );
-    result += "</h3>";
-    if ( dict.isToLanguageRTL() ) {
-      result += "<div class=\"bglrtl\">" + i->second.second + "</div>";
-    }
-    else {
-      result += "<div>" + i->second.second + "</div>";
-    }
-    result += cleaner;
-  }
-  // Do some cleanups in the text
-
-  BglDictionary::replaceCharsetEntities( result );
-
-  result =
-    QString::fromUtf8( result.c_str() )
-      // onclick location to link
-      .replace( QRegularExpression(
-                  R"(<([a-z0-9]+)\s+[^>]*onclick="[a-z.]*location(?:\.href)\s*=\s*'([^']+)[^>]*>([^<]+)</\1>)",
-                  QRegularExpression::CaseInsensitiveOption ),
-                R"(<a href="\2">\3</a>)" )
-      .replace(
-        QRegularExpression( R"((<\s*a\s+[^>]*href\s*=\s*["']\s*)bword://)", QRegularExpression::CaseInsensitiveOption ),
-        "\\1bword:" )
-      //remove invalid width, height attrs
-      .replace( QRegularExpression( R"((width|height)\s*=\s*["']\d{7,}["''])" ), "" )
-      //remove invalid <br> tag
-      .replace(
-        QRegularExpression(
-          R"(<br>(<div|<table|<tbody|<tr|<td|</div>|</table>|</tbody>|</tr>|</td>|function addScript|var scNode|scNode|var atag|while\(atag|atag=atag|document\.getElementsByTagName|addScript|src="bres|<a onmouseover="return overlib|onclick="return overlib))",
-          QRegularExpression::CaseInsensitiveOption ),
-        "\\1" )
-      .replace(
-        QRegularExpression(
-          R"((AUTOSTATUS, WRAP\);" |</DIV>|addScript\('JS_FILE_PHONG_VT_45634'\);|appendChild\(scNode\);|atag\.firstChild;)<br>)",
-          QRegularExpression::CaseInsensitiveOption ),
-        " \\1 " )
-      .toUtf8()
-      .data();
-
-
-  appendString( result );
-
+  appendString( html );
   hasAnyData = true;
 
   finish();

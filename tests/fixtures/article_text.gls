@@ -1,4 +1,5 @@
 ### Glossary title:Article text fixture
+### Description:Fixture for <b>readable</b> articles.
 ### Glossary section:
 qt-layout
 <style>.senses{counter-reset:sense}.senses p{counter-increment:sense}.senses p::before{content:counter(sense) ". "}.senses rt{display:none}</style>
@@ -12,3 +13,9 @@ qt-layout
 
 qt-scan
 <img style="width:16em;height:16em"><p>←　→</p>
+
+qt-pair
+<div class="mdict"><p>First homonym</p><hr><p>Second sense of first homonym</p></div>
+
+qt-pair
+<img style="width:16em;height:16em"><p>二</p>

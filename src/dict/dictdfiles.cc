@@ -390,19 +390,23 @@ sptr< Dictionary::DataRequest > DictdDictionary::getArticle( const std::u32strin
       return std::make_shared< Dictionary::DataRequestInstant >( false );
     }
 
+    auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
     string result;
 
     multimap< std::u32string, string >::const_iterator i;
 
     for ( i = mainArticles.begin(); i != mainArticles.end(); ++i ) {
+      const auto start = result.size();
       result += i->second;
+      ret->recordArticle( start, result.size() );
     }
 
     for ( i = alternateArticles.begin(); i != alternateArticles.end(); ++i ) {
+      const auto start = result.size();
       result += i->second;
+      ret->recordArticle( start, result.size() );
     }
 
-    auto ret = std::make_shared< Dictionary::DataRequestInstant >( true );
     ret->appendString( result );
 
     return ret;

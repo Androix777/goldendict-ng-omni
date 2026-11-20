@@ -3,6 +3,7 @@
 import base64
 import json
 import re
+import time
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -32,6 +33,57 @@ def test_article_text():
     assert "invisible" not in text and "primarily-visual" not in layout["warnings"]
     scan, = get("lookup", word="qt-scan", format="text")["articles"]
     assert "[image]" in scan["text"] and "primarily-visual" in scan["warnings"], scan
+
+
+def test_headwords():
+    catalog = get("dictionaries")["dictionaries"]
+    summary = next(d for d in catalog if d["name"] == "Article text fixture")
+    assert summary["articleCount"] == summary["wordCount"] == 4 and summary["fileSizeBytes"] > 0
+    dictionary = summary["id"]
+    # A fresh profile builds its normal headword cache in the background.
+    deadline = time.monotonic() + 30
+    while True:
+        info, = get("dictionaries", dictionary=dictionary)["dictionaries"]
+        if info["headwordStatus"] == "ready":
+            break
+        assert info["headwordStatus"] == "unavailable" and time.monotonic() < deadline, info
+        time.sleep(0.1)
+    assert info["headwordCount"] == 3 and "Fixture for readable articles." in info["description"]
+    def browse(**params):
+        return get("headwords", dictionary=dictionary, **params)
+
+    whole = browse()
+    rows = [{"index": i, "word": word} for i, word in enumerate(("qt-layout", "qt-pair", "qt-scan"))]
+    assert whole == {"dictionaryId": dictionary, "total": 3, "headwords": rows, "nextOffset": None}
+    first = browse(limit=1)
+    assert first["headwords"] == rows[:1] and first["nextOffset"] == 1
+    assert browse(offset=first["nextOffset"])["headwords"] == rows[1:]
+    assert browse(offset=3)["headwords"] == []
+    assert browse(indices="1,0,1")["headwords"] == [rows[1], rows[0], rows[1]]
+    assert browse(mode="sample", limit=1)["headwords"] == [rows[1]]
+    assert browse(mode="sample", limit=5)["headwords"] == rows
+    assert get("lookup", dictionary=dictionary, word=rows[1]["word"])["articles"]
+    for params in ({"indices": "3"}, {"indices": "0,"}, {"indices": "-1"}, {"indices": "0", "offset": 0},
+                   {"limit": 101}, {"limit": 0}, {"offset": -1}, {"mode": "sample", "offset": 1}):
+        assert get("headwords", 400, dictionary=dictionary, **params)["error"]
+    assert get("headwords", 400)["error"] and get("headwords", 404, dictionary="unknown")["error"]
+
+
+def test_split_entries():
+    html = get("lookup", word="qt-pair")["articles"]
+    dictionary = html[0]["dictionaryId"]
+    text = get("lookup", word="qt-pair", dictionary=dictionary, format="text")["articles"]
+    assert len(html) == len(text) == 2
+    assert sum("First homonym" in raw["html"] for raw in html) == 1
+    for raw, readable in zip(html, text):
+        assert raw["dictionaryId"] == readable["dictionaryId"] == dictionary
+        assert raw["dictionaryName"] == readable["dictionaryName"] == "Article text fixture"
+        assert "html" not in readable
+        first = "First homonym" in raw["html"]
+        assert ("First homonym" in readable["text"]) == first
+        assert ("Second sense of first homonym" in readable["text"]) == first
+        assert ("二" in readable["text"]) != first
+        assert ("primarily-visual" in readable["warnings"]) != first
 
 
 def test_api():
@@ -74,4 +126,6 @@ def test_api():
 if __name__ == "__main__":
     test_api()
     test_article_text()
+    test_split_entries()
+    test_headwords()
     print("Dictionary API smoke test passed.")

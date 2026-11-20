@@ -1533,7 +1533,9 @@ void DslArticleRequest::run()
         string( "<span class=\"dsl_article\">" ) + QObject::tr( "Article loading error" ).toStdString() + "</span>";
     }
 
+    const auto start = data.size();
     appendString( articleText );
+    recordArticle( start, start + articleText.size() );
 
     hasAnyData = true;
   }
